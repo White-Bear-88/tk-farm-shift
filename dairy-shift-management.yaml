@@ -80,6 +80,20 @@ Resources:
         AllowOrigin: "'*'"
 
   # Lambda Functions
+  WebAppFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'dairy-web-app-${Environment}'
+      CodeUri: src/
+      Handler: web_app.lambda_handler
+      Events:
+        WebApp:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /
+            Method: GET
+
   ShiftCrudFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -94,7 +108,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref ShiftManagementApi
-            Path: /shifts/{date}
+            Path: /shifts/by-date/{date}
             Method: GET
         CreateShift:
           Type: Api
@@ -106,13 +120,13 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref ShiftManagementApi
-            Path: /shifts/{id}
+            Path: /shifts/by-id/{id}
             Method: PUT
         DeleteShift:
           Type: Api
           Properties:
             RestApiId: !Ref ShiftManagementApi
-            Path: /shifts/{id}
+            Path: /shifts/by-id/{id}
             Method: DELETE
 
   EmployeeShiftFunction:
