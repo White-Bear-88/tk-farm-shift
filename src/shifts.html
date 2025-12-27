@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シフト管理 - 酪農シフト管理システム</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .back-btn:hover {
+            background: #5a6268;
+        }
+        .section {
+            background: white;
+            margin: 20px 0;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .btn-success {
+            background: #28a745;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .shift-calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .calendar-day {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            min-height: 150px;
+            border: 2px solid transparent;
+        }
+        .calendar-day.selected {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        .calendar-day h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+            text-align: center;
+        }
+        .shift-item {
+            background: white;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 3px solid #28a745;
+            font-size: 12px;
+        }
+        .shift-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .shift-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .shift-card h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .auto-assign-form {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #c3e6cb;
+        }
+        .task-requirement {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 シフト管理</h1>
+            <a href="menu.html" class="back-btn">← メニューに戻る</a>
+        </div>
+
+        <div class="section">
+            <h2>シフト作成・編集</h2>
+            <form id="shiftForm">
+                <input type="hidden" id="shiftId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>日付:</label>
+                        <input type="date" id="shiftDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>従業員ID:</label>
+                        <select id="employeeSelect" required>
+                            <option value="">従業員を選択</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>作業種別:</label>
+                        <select id="taskSelect" required>
+                            <option value="">作業を選択</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>ステータス:</label>
+                        <select id="shiftStatus">
+                            <option value="scheduled">予定</option>
+                            <option value="in_progress">作業中</option>
+                            <option value="completed">完了</option>
+                            <option value="cancelled">キャンセル</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>開始時間:</label>
+                        <input type="time" id="startTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label>終了時間:</label>
+                        <input type="time" id="endTime" required>
+                    </div>
+                </div>
+                <button type="submit" id="submitBtn">シフト作成</button>
+                <button type="button" onclick="resetForm()">リセット</button>
+            </form>
+            <div id="formMessage"></div>
+        </div>
+
+        <div class="section">
+            <h2>自動シフト割り当て</h2>
+            <div class="auto-assign-form">
+                <form id="autoAssignForm">
+                    <div class="form-group">
+                        <label>割り当て日付:</label>
+                        <input type="date" id="assignDate" required>
+                    </div>
+                    <div id="taskRequirements">
+                        <div class="task-requirement">
+                            <label>搾乳:</label>
+                            <input type="number" value="2" min="1" data-task="milking">
+                            <span>人</span>
+                        </div>
+                        <div class="task-requirement">
+                            <label>給餌:</label>
+                            <input type="number" value="1" min="1" data-task="feeding">
+                            <span>人</span>
+                        </div>
+                        <div class="task-requirement">
+                            <label>清掃:</label>
+                            <input type="number" value="1" min="1" data-task="cleaning">
+                            <span>人</span>
+                        </div>
+                        <div class="task-requirement">
+                            <label>見回り:</label>
+                            <input type="number" value="1" min="1" data-task="patrol">
+                            <span>人</span>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-success">自動割り当て実行</button>
+                </form>
+                <div id="assignMessage"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>シフト検索・一覧</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>検索日付:</label>
+                    <input type="date" id="searchDate">
+                </div>
+                <div class="form-group">
+                    <label>従業員フィルター:</label>
+                    <select id="employeeFilter">
+                        <option value="">全従業員</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="searchShifts()">検索</button>
+            <button onclick="loadTodayShifts()">今日のシフト</button>
+            <div id="shiftResults" class="shift-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev';
+
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadEmployees();
+            loadTasks();
+            setDefaultDates();
+            loadTodayShifts();
+        });
+
+        // 従業員一覧読み込み
+        async function loadEmployees() {
+            try {
+                const response = await fetch(`${API_BASE}/employees`);
+                const employees = await response.json();
+                
+                const selects = [document.getElementById('employeeSelect'), document.getElementById('employeeFilter')];
+                selects.forEach(select => {
+                    const currentValue = select.value;
+                    select.innerHTML = select.id === 'employeeFilter' ? '<option value="">全従業員</option>' : '<option value="">従業員を選択</option>';
+                    
+                    employees.forEach(emp => {
+                        const option = document.createElement('option');
+                        option.value = emp.employee_id;
+                        option.textContent = `${emp.name} (${emp.employee_id})`;
+                        select.appendChild(option);
+                    });
+                    
+                    select.value = currentValue;
+                });
+            } catch (error) {
+                console.error('従業員読み込みエラー:', error);
+            }
+        }
+
+        // 作業種別一覧読み込み
+        async function loadTasks() {
+            try {
+                const response = await fetch(`${API_BASE}/tasks`);
+                const tasks = await response.json();
+                
+                const select = document.getElementById('taskSelect');
+                const currentValue = select.value;
+                select.innerHTML = '<option value="">作業を選択</option>';
+                
+                tasks.forEach(task => {
+                    const option = document.createElement('option');
+                    option.value = task.task_type;
+                    option.textContent = `${task.name} (${task.task_type})`;
+                    select.appendChild(option);
+                });
+                
+                select.value = currentValue;
+            } catch (error) {
+                console.error('作業種別読み込みエラー:', error);
+            }
+        }
+
+        // デフォルト日付設定
+        function setDefaultDates() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('shiftDate').value = today;
+            document.getElementById('searchDate').value = today;
+            document.getElementById('assignDate').value = today;
+        }
+
+        // シフト作成・更新
+        document.getElementById('shiftForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const data = {
+                date: document.getElementById('shiftDate').value,
+                employee_id: document.getElementById('employeeSelect').value,
+                task_type: document.getElementById('taskSelect').value,
+                start_time: document.getElementById('startTime').value,
+                end_time: document.getElementById('endTime').value,
+                status: document.getElementById('shiftStatus').value
+            };
+
+            const isEdit = document.getElementById('shiftId').value;
+            const method = isEdit ? 'PUT' : 'POST';
+            const url = isEdit ? `${API_BASE}/shifts/${isEdit}` : `${API_BASE}/shifts`;
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    showMessage('formMessage', 'success', isEdit ? 'シフトを更新しました' : 'シフトを作成しました');
+                    resetForm();
+                    searchShifts();
+                } else {
+                    throw new Error('操作に失敗しました');
+                }
+            } catch (error) {
+                showMessage('formMessage', 'error', `エラー: ${error.message}`);
+            }
+        });
+
+        // 自動シフト割り当て
+        document.getElementById('autoAssignForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const requiredTasks = [];
+            document.querySelectorAll('#taskRequirements input[type="number"]').forEach(input => {
+                const count = parseInt(input.value);
+                if (count > 0) {
+                    requiredTasks.push({
+                        task_type: input.dataset.task,
+                        count: count
+                    });
+                }
+            });
+
+            const data = {
+                date: document.getElementById('assignDate').value,
+                required_tasks: requiredTasks
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/shifts/assign`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    showMessage('assignMessage', 'success', '自動シフト割り当てが完了しました');
+                    searchShifts();
+                } else {
+                    throw new Error('自動割り当てに失敗しました');
+                }
+            } catch (error) {
+                showMessage('assignMessage', 'error', `エラー: ${error.message}`);
+            }
+        });
+
+        // シフト検索
+        async function searchShifts() {
+            const date = document.getElementById('searchDate').value;
+            const employeeId = document.getElementById('employeeFilter').value;
+            
+            if (!date) {
+                showMessage('shiftResults', 'error', '検索日付を選択してください');
+                return;
+            }
+
+            try {
+                let url = `${API_BASE}/shifts/by-date/${date}`;
+                if (employeeId) {
+                    url = `${API_BASE}/employees/${employeeId}/shifts?date=${date}`;
+                }
+                
+                const response = await fetch(url);
+                const shifts = await response.json();
+                
+                displayShifts(shifts);
+            } catch (error) {
+                document.getElementById('shiftResults').innerHTML = 
+                    `<div class="error">エラー: ${error.message}</div>`;
+            }
+        }
+
+        // 今日のシフト読み込み
+        function loadTodayShifts() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('searchDate').value = today;
+            searchShifts();
+        }
+
+        // シフト表示
+        function displayShifts(shifts) {
+            const resultsDiv = document.getElementById('shiftResults');
+            
+            if (shifts.length === 0) {
+                resultsDiv.innerHTML = '<p>該当するシフトがありません</p>';
+                return;
+            }
+
+            resultsDiv.innerHTML = shifts.map(shift => `
+                <div class="shift-card">
+                    <h4>${shift.date} - ${getTaskName(shift.task_type)}</h4>
+                    <p><strong>従業員:</strong> ${shift.employee_id}</p>
+                    <p><strong>時間:</strong> ${shift.start_time} - ${shift.end_time}</p>
+                    <p><strong>ステータス:</strong> ${getStatusName(shift.status)}</p>
+                    <button onclick="editShift('${shift.shift_id}')">編集</button>
+                    <button class="btn-danger" onclick="deleteShift('${shift.shift_id}')">削除</button>
+                </div>
+            `).join('');
+        }
+
+        // シフト編集
+        function editShift(shiftId) {
+            // 実装: APIからシフト詳細を取得して編集フォームに設定
+            fetch(`${API_BASE}/shifts/${shiftId}`)
+                .then(response => response.json())
+                .then(shift => {
+                    document.getElementById('shiftId').value = shift.shift_id;
+                    document.getElementById('shiftDate').value = shift.date;
+                    document.getElementById('employeeSelect').value = shift.employee_id;
+                    document.getElementById('taskSelect').value = shift.task_type;
+                    document.getElementById('startTime').value = shift.start_time;
+                    document.getElementById('endTime').value = shift.end_time;
+                    document.getElementById('shiftStatus').value = shift.status;
+                    
+                    document.getElementById('submitBtn').textContent = 'シフト更新';
+                    window.scrollTo(0, 0);
+                })
+                .catch(error => showMessage('formMessage', 'error', `エラー: ${error.message}`));
+        }
+
+        // シフト削除
+        async function deleteShift(shiftId) {
+            if (!confirm('このシフトを削除しますか？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/shifts/${shiftId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showMessage('formMessage', 'success', 'シフトを削除しました');
+                    searchShifts();
+                } else {
+                    throw new Error('削除に失敗しました');
+                }
+            } catch (error) {
+                showMessage('formMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
+        // フォームリセット
+        function resetForm() {
+            document.getElementById('shiftForm').reset();
+            document.getElementById('shiftId').value = '';
+            document.getElementById('submitBtn').textContent = 'シフト作成';
+            setDefaultDates();
+        }
+
+        // メッセージ表示
+        function showMessage(elementId, type, message) {
+            const messageDiv = document.getElementById(elementId);
+            messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
+            setTimeout(() => messageDiv.innerHTML = '', 5000);
+        }
+
+        // 作業名変換
+        function getTaskName(taskType) {
+            const names = {
+                'milking': '搾乳',
+                'feeding': '給餌',
+                'cleaning': '清掃',
+                'patrol': '見回り'
+            };
+            return names[taskType] || taskType;
+        }
+
+        // ステータス名変換
+        function getStatusName(status) {
+            const names = {
+                'scheduled': '予定',
+                'in_progress': '作業中',
+                'completed': '完了',
+                'cancelled': 'キャンセル'
+            };
+            return names[status] || status;
+        }
+    </script>
+</body>
+</html>
