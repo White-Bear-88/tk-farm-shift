@@ -37,9 +37,14 @@ def generate_monthly_shifts(event):
     """月間シフト自動生成"""
     data = json.loads(event['body'])
     month = data['month']  # "2024-12" format
+    overwrite = data.get('overwrite', True)  # デフォルトで上書き
     
     year, month_num = map(int, month.split('-'))
     days_in_month = calendar.monthrange(year, month_num)[1]
+    
+    # 上書きモードの場合、既存シフトを削除
+    if overwrite:
+        delete_existing_shifts_for_month(month)
     
     # 月別/グローバルデフォルト人数設定を取得
     requirements = get_requirements_for_month(month)
@@ -60,7 +65,7 @@ def generate_monthly_shifts(event):
             day_requirements = requirements
         
         # その日のシフトを生成
-        day_shifts = generate_day_shifts(date, day_requirements, employees)
+        day_shifts = generate_day_shifts(date, day_requirements, employees, overwrite)
         generated_shifts.extend(day_shifts)
     
     return {
@@ -71,6 +76,27 @@ def generate_monthly_shifts(event):
             'shifts': generated_shifts
         })
     }
+
+def delete_existing_shifts_for_month(month):
+    """月の既存シフトを削除"""
+    year, month_num = map(int, month.split('-'))
+    days_in_month = calendar.monthrange(year, month_num)[1]
+    
+    for day in range(1, days_in_month + 1):
+        date = f"{month}-{day:02d}"
+        
+        # その日のシフトを取得
+        response = table.query(
+            KeyConditionExpression='PK = :pk',
+            ExpressionAttributeValues={':pk': f'SHIFT#{date}'}
+        )
+        
+        # 一括削除
+        with table.batch_writer() as batch:
+            for item in response['Items']:
+                batch.delete_item(
+                    Key={'PK': item['PK'], 'SK': item['SK']}
+                )
 
 def get_shifts_by_month(month):
     """月別シフト取得"""
@@ -141,7 +167,7 @@ def get_daily_requirements(date):
         pass
     return None
 
-def generate_day_shifts(date, requirements, employees):
+def generate_day_shifts(date, requirements, employees, overwrite=True):
     """1日分のシフトを生成"""
     shifts = []
     
@@ -173,10 +199,47 @@ def generate_day_shifts(date, requirements, employees):
                 'end_time': end_time
             }
             
-            save_shift_assignment(shift)
-            shifts.append(shift)
+            # 冪等性を保つための保存
+            if save_shift_assignment_safe(shift, overwrite):
+                shifts.append(shift)
     
     return shifts
+
+def save_shift_assignment_safe(assignment, overwrite=True):
+    """冪等性を保つシフト保存"""
+    pk = f"SHIFT#{assignment['date']}"
+    sk = f"EMP#{assignment['employee_id']}#{assignment['task_type']}"
+    
+    item = {
+        'PK': pk,
+        'SK': sk,
+        'GSI1PK': assignment['employee_id'],
+        'GSI1SK': assignment['date'],
+        'GSI2PK': assignment['task_type'],
+        'GSI2SK': f"{assignment['date']}#{assignment['employee_id']}",
+        'start_time': assignment['start_time'],
+        'end_time': assignment['end_time'],
+        'status': 'auto_assigned',
+        'created_at': datetime.now().isoformat()
+    }
+    
+    try:
+        if overwrite:
+            # 上書きモード：無条件で保存
+            table.put_item(Item=item)
+        else:
+            # 新規作成モード：既存しない場合のみ保存
+            table.put_item(
+                Item=item,
+                ConditionExpression='attribute_not_exists(PK)'
+            )
+        return True
+    except table.meta.client.exceptions.ConditionalCheckFailedException:
+        # 既に存在する場合はスキップ
+        return False
+    except Exception as e:
+        print(f"Error saving shift: {e}")
+        return False
 
 def assign_shifts(event):
     """日別シフト割り当て"""
@@ -321,18 +384,5 @@ def has_time_overlap(start1, end1, start2, end2):
     return not (end1_dt <= start2_dt or end2_dt <= start1_dt)
 
 def save_shift_assignment(assignment):
-    """シフト割り当てをDynamoDBに保存"""
-    item = {
-        'PK': f"SHIFT#{assignment['date']}",
-        'SK': f"EMP#{assignment['employee_id']}#{assignment['task_type']}",
-        'GSI1PK': assignment['employee_id'],
-        'GSI1SK': assignment['date'],
-        'GSI2PK': assignment['task_type'],
-        'GSI2SK': f"{assignment['date']}#{assignment['employee_id']}",
-        'start_time': assignment['start_time'],
-        'end_time': assignment['end_time'],
-        'status': 'auto_assigned',
-        'created_at': datetime.now().isoformat()
-    }
-    
-    table.put_item(Item=item)
+    """シフト割り当てをDynamoDBに保存（互換性のため保持）"""
+    return save_shift_assignment_safe(assignment, overwrite=True)

@@ -414,11 +414,25 @@
                 return;
             }
             
+            // 既存シフトがあるか確認
+            const existingShifts = await checkExistingShifts(monthValue);
+            let overwrite = true;
+            
+            if (existingShifts > 0) {
+                overwrite = confirm(`${monthValue}には既に${existingShifts}件のシフトがあります。\n上書きしますか？`);
+                if (!overwrite) {
+                    return;
+                }
+            }
+            
             try {
                 const response = await fetch(`${API_BASE}/shifts/generate-monthly`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ month: monthValue })
+                    body: JSON.stringify({ 
+                        month: monthValue,
+                        overwrite: overwrite 
+                    })
                 });
                 
                 if (response.ok) {
@@ -431,6 +445,20 @@
             } catch (error) {
                 showMessage('generateMessage', 'error', `エラー: ${error.message}`);
             }
+        }
+
+        // 既存シフト数をチェック
+        async function checkExistingShifts(month) {
+            try {
+                const response = await fetch(`${API_BASE}/shifts/by-month/${month}`);
+                if (response.ok) {
+                    const shifts = await response.json();
+                    return shifts.length;
+                }
+            } catch (error) {
+                console.error('既存シフトチェックエラー:', error);
+            }
+            return 0;
         }
 
         // 従業員一覧読み込み
