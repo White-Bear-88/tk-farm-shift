@@ -94,6 +94,13 @@ Resources:
               Ref: ShiftManagementApi
             Path: /
             Method: GET
+        WebAppHtml:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /{filename}
+            Method: GET
     Metadata:
       SamResourceId: WebAppFunction
   ShiftCrudFunction:
@@ -138,6 +145,55 @@ Resources:
             Method: DELETE
     Metadata:
       SamResourceId: ShiftCrudFunction
+  EmployeeManagementFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: dairy-employee-management-${Environment}
+      CodeUri: EmployeeManagementFunction
+      Handler: employee_management.lambda_handler
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ShiftManagementTable
+      Events:
+        GetEmployees:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /employees
+            Method: GET
+        CreateEmployee:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /employees
+            Method: POST
+        GetEmployee:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /employees/{id}
+            Method: GET
+        UpdateEmployee:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /employees/{id}
+            Method: PUT
+        DeleteEmployee:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /employees/{id}
+            Method: DELETE
+    Metadata:
+      SamResourceId: EmployeeManagementFunction
   EmployeeShiftFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -165,7 +221,7 @@ Resources:
       FunctionName:
         Fn::Sub: dairy-task-management-${Environment}
       CodeUri: TaskManagementFunction
-      Handler: task_management.lambda_handler
+      Handler: task_management_crud.lambda_handler
       Policies:
       - DynamoDBCrudPolicy:
           TableName:
@@ -178,6 +234,34 @@ Resources:
               Ref: ShiftManagementApi
             Path: /tasks
             Method: GET
+        CreateTask:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /tasks
+            Method: POST
+        GetTask:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /tasks/{id}
+            Method: GET
+        UpdateTask:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /tasks/{id}
+            Method: PUT
+        DeleteTask:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /tasks/{id}
+            Method: DELETE
     Metadata:
       SamResourceId: TaskManagementFunction
   ShiftAssignmentFunction:
@@ -199,9 +283,76 @@ Resources:
               Ref: ShiftManagementApi
             Path: /shifts/assign
             Method: POST
+        GenerateMonthly:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /shifts/generate-monthly
+            Method: POST
+        GetShiftsByMonth:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /shifts/by-month/{month}
+            Method: GET
     Metadata:
       SamResourceId: ShiftAssignmentFunction
+  SettingsManagementFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: dairy-settings-management-${Environment}
+      CodeUri: SettingsManagementFunction
+      Handler: settings_management.lambda_handler
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ShiftManagementTable
+      Events:
+        RequirementsGlobalDefault:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /requirements/global-default
+            Method: ANY
+        RequirementsMonthly:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /requirements/default/{month}
+            Method: ANY
+        RequirementsDaily:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /requirements/daily/{date}
+            Method: ANY
+        SettingsConfirmation:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /settings/confirmation
+            Method: ANY
+        SettingsVacationDefault:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /settings/vacation-default
+            Method: ANY
+    Metadata:
+      SamResourceId: SettingsManagementFunction
 Outputs:
+  WebAppUrl:
+    Description: Web Application URL
+    Value:
+      Fn::Sub: https://${ShiftManagementApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/
   ApiUrl:
     Description: API Gateway endpoint URL
     Value:

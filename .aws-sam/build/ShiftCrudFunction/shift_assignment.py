@@ -3,38 +3,29 @@ import boto3
 import os
 from datetime import datetime, timedelta
 from collections import defaultdict
+import calendar
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
 def lambda_handler(event, context):
     try:
-        data = json.loads(event['body'])
-        date = data['date']
-        required_tasks = data['required_tasks']  # [{'task_type': 'milking', 'count': 2}, ...]
+        http_method = event['httpMethod']
+        path = event['path']
         
-        # 利用可能な従業員を取得
-        available_employees = get_available_employees(date)
-        
-        # 既存のシフトを確認
-        existing_shifts = get_existing_shifts(date)
-        
-        # 自動割り当てロジック
-        assignments = auto_assign_shifts(date, required_tasks, available_employees, existing_shifts)
-        
-        # DynamoDBに保存
-        for assignment in assignments:
-            save_shift_assignment(assignment)
-        
-        return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({
-                'message': f'Successfully assigned {len(assignments)} shifts',
-                'assignments': assignments
-            })
-        }
-        
+        if http_method == 'POST' and path == '/shifts/generate-monthly':
+            return generate_monthly_shifts(event)
+        elif http_method == 'GET' and '/shifts/by-month/' in path:
+            month = path.split('/')[-1]
+            return get_shifts_by_month(month)
+        elif http_method == 'POST' and path == '/shifts/assign':
+            return assign_shifts(event)
+        else:
+            return {
+                'statusCode': 404,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'Not found'})
+            }
     except Exception as e:
         return {
             'statusCode': 500,
@@ -42,22 +33,189 @@ def lambda_handler(event, context):
             'body': json.dumps({'error': str(e)})
         }
 
-def get_available_employees(date):
+def generate_monthly_shifts(event):
+    """月間シフト自動生成"""
+    data = json.loads(event['body'])
+    month = data['month']  # "2024-12" format
+    
+    year, month_num = map(int, month.split('-'))
+    days_in_month = calendar.monthrange(year, month_num)[1]
+    
+    # 月別/グローバルデフォルト人数設定を取得
+    requirements = get_requirements_for_month(month)
+    
+    # 従業員リストを取得
+    employees = get_available_employees()
+    
+    generated_shifts = []
+    
+    for day in range(1, days_in_month + 1):
+        date = f"{month}-{day:02d}"
+        
+        # 日別設定があるかチェック
+        daily_reqs = get_daily_requirements(date)
+        if daily_reqs:
+            day_requirements = daily_reqs
+        else:
+            day_requirements = requirements
+        
+        # その日のシフトを生成
+        day_shifts = generate_day_shifts(date, day_requirements, employees)
+        generated_shifts.extend(day_shifts)
+    
+    return {
+        'statusCode': 200,
+        'headers': {'Content-Type': 'application/json'},
+        'body': json.dumps({
+            'message': f'Generated {len(generated_shifts)} shifts for {month}',
+            'shifts': generated_shifts
+        })
+    }
+
+def get_shifts_by_month(month):
+    """月別シフト取得"""
+    year, month_num = map(int, month.split('-'))
+    days_in_month = calendar.monthrange(year, month_num)[1]
+    
+    all_shifts = []
+    
+    for day in range(1, days_in_month + 1):
+        date = f"{month}-{day:02d}"
+        
+        response = table.query(
+            KeyConditionExpression='PK = :pk',
+            ExpressionAttributeValues={':pk': f'SHIFT#{date}'}
+        )
+        
+        for item in response['Items']:
+            shift = {
+                'date': date,
+                'employee_id': item['SK'].split('#')[1],
+                'task_type': item['SK'].split('#')[2],
+                'start_time': item['start_time'],
+                'end_time': item['end_time'],
+                'status': item.get('status', 'scheduled')
+            }
+            all_shifts.append(shift)
+    
+    return {
+        'statusCode': 200,
+        'headers': {'Content-Type': 'application/json'},
+        'body': json.dumps(all_shifts)
+    }
+
+def get_requirements_for_month(month):
+    """月別またはグローバルデフォルト人数設定を取得"""
+    # 月別設定を試行
+    try:
+        response = table.get_item(
+            Key={'PK': 'REQUIREMENTS', 'SK': f'MONTH#{month}'}
+        )
+        if 'Item' in response:
+            return response['Item']['requirements']
+    except:
+        pass
+    
+    # グローバルデフォルト設定を取得
+    try:
+        response = table.get_item(
+            Key={'PK': 'REQUIREMENTS', 'SK': 'GLOBAL_DEFAULT'}
+        )
+        if 'Item' in response:
+            return response['Item']['requirements']
+    except:
+        pass
+    
+    # デフォルト値
+    return {'milking': 2, 'feeding': 1, 'cleaning': 1, 'patrol': 1}
+
+def get_daily_requirements(date):
+    """日別人数設定を取得"""
+    try:
+        response = table.get_item(
+            Key={'PK': 'REQUIREMENTS', 'SK': f'DAILY#{date}'}
+        )
+        if 'Item' in response:
+            return response['Item']['requirements']
+    except:
+        pass
+    return None
+
+def generate_day_shifts(date, requirements, employees):
+    """1日分のシフトを生成"""
+    shifts = []
+    
+    task_schedules = {
+        'milking': [('05:00', '07:00')],
+        'feeding': [('08:00', '09:00')],
+        'cleaning': [('10:00', '11:30')],
+        'patrol': [('14:00', '14:30')]
+    }
+    
+    for task_type, count in requirements.items():
+        if count <= 0:
+            continue
+            
+        # スキルを持つ従業員をフィルタ
+        skilled_employees = [emp for emp in employees if task_type in emp.get('skills', [])]
+        
+        # 必要人数分割り当て
+        for i in range(min(count, len(skilled_employees))):
+            employee = skilled_employees[i]
+            times = task_schedules.get(task_type, [('09:00', '17:00')])
+            start_time, end_time = times[0]
+            
+            shift = {
+                'date': date,
+                'employee_id': employee['id'],
+                'task_type': task_type,
+                'start_time': start_time,
+                'end_time': end_time
+            }
+            
+            save_shift_assignment(shift)
+            shifts.append(shift)
+    
+    return shifts
+
+def assign_shifts(event):
+    """日別シフト割り当て"""
+    data = json.loads(event['body'])
+    date = data['date']
+    required_tasks = data['required_tasks']
+    
+    available_employees = get_available_employees()
+    existing_shifts = get_existing_shifts(date)
+    
+    assignments = auto_assign_shifts(date, required_tasks, available_employees, existing_shifts)
+    
+    for assignment in assignments:
+        save_shift_assignment(assignment)
+    
+    return {
+        'statusCode': 200,
+        'headers': {'Content-Type': 'application/json'},
+        'body': json.dumps({
+            'message': f'Successfully assigned {len(assignments)} shifts',
+            'assignments': assignments
+        })
+    }
+
+def get_available_employees():
     """利用可能な従業員リストを取得"""
-    response = table.scan(
-        FilterExpression='begins_with(PK, :pk)',
-        ExpressionAttributeValues={':pk': 'EMP#'}
+    response = table.query(
+        KeyConditionExpression='PK = :pk',
+        ExpressionAttributeValues={':pk': 'EMPLOYEE'}
     )
     
     employees = []
     for item in response['Items']:
-        if item['SK'] == 'PROFILE':
-            employees.append({
-                'id': item['PK'].split('#')[1],
-                'name': item['name'],
-                'skills': item.get('skills', []),
-                'max_hours_per_day': item.get('max_hours_per_day', 8)
-            })
+        employees.append({
+            'id': item['SK'],
+            'name': item.get('name', ''),
+            'skills': item.get('skills', []),
+            'max_hours_per_day': item.get('max_hours_per_day', 8)
+        })
     
     return employees
 
