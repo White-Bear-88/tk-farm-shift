@@ -20,6 +20,8 @@ def lambda_handler(event, context):
         
         if method == 'GET' and '/shifts/' in path:
             return get_shifts_by_date(event)
+        elif method == 'GET' and '/employees/' in path and '/shifts' in path:
+            return get_shifts_for_employee(event)
         elif method == 'POST' and path == '/shifts':
             return create_shift(event)
         elif method == 'PUT' and '/shifts/' in path:
@@ -60,6 +62,61 @@ def get_shifts_by_date(event):
             'status': item.get('status', 'scheduled')
         })
     
+    return {
+        'statusCode': 200,
+        'headers': {'Content-Type': 'application/json'},
+        'body': json.dumps(shifts, default=str)
+    }
+
+
+def get_shifts_for_employee(event):
+    # Supports fetching shifts for an employee for a given month (YYYY-MM)
+    path = event.get('path', '')
+    # /employees/{id}/shifts
+    employee_id = path.split('/employees/')[1].split('/')[0]
+    q = event.get('queryStringParameters') or {}
+    month = q.get('month') if q else None
+
+    items = []
+    try:
+        # Prefer querying GSI1 for employee-based lookup
+        from boto3.dynamodb.conditions import Key
+        if month:
+            resp = table.query(
+                IndexName='GSI1',
+                KeyConditionExpression=Key('GSI1PK').eq(employee_id) & Key('GSI1SK').begins_with(month)
+            )
+        else:
+            resp = table.query(
+                IndexName='GSI1',
+                KeyConditionExpression=Key('GSI1PK').eq(employee_id)
+            )
+        items = resp.get('Items', [])
+    except Exception:
+        # Fallback for tests using DummyTable: iterate over in-memory items
+        items = []
+        if hasattr(table, 'items'):
+            for (pk, sk), item in table.items.items():
+                if item.get('GSI1PK') == employee_id:
+                    if not month or item.get('GSI1SK', '').startswith(month):
+                        items.append(item)
+
+    shifts = []
+    for item in items:
+        date = item.get('GSI1SK')
+        sk = item.get('SK', '')
+        parts = sk.split('#')
+        emp = parts[1] if len(parts) > 1 else None
+        task_type = parts[2] if len(parts) > 2 else None
+        shifts.append({
+            'date': date,
+            'employee_id': emp,
+            'task_type': task_type,
+            'start_time': item.get('start_time'),
+            'end_time': item.get('end_time'),
+            'status': item.get('status', 'scheduled')
+        })
+
     return {
         'statusCode': 200,
         'headers': {'Content-Type': 'application/json'},

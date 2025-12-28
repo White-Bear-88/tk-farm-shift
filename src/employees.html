@@ -154,7 +154,7 @@
                 <input type="number" id="defaultVacationDays" min="0" value="20" placeholder="20">
                 <span>日</span>
             </div>
-            <button onclick="saveDefaultVacation()">デフォルト設定保存</button>
+            <button onclick="saveDefaultVacation()">保存</button>
             <div id="vacationDefaultMessage"></div>
         </div>
 
@@ -397,7 +397,7 @@
                 });
                 
                 if (response.ok) {
-                    showMessage('vacationDefaultMessage', 'success', 'デフォルト有給日数を設定しました');
+                    showMessage('vacationDefaultMessage', 'success', '更新しました。');
                 } else {
                     throw new Error('設定に失敗しました');
                 }

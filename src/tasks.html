@@ -155,6 +155,34 @@
         .time-input input {
             width: 80px;
         }
+        /* Modal styles for task add/edit dialog */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            inset: 0;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 0;
+            padding: 20px;
+            border-radius: 10px;
+            width: 520px;
+            max-width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+        }
+        .modal .close {
+            float: right;
+            font-size: 20px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -172,62 +200,52 @@
                     <input type="number" id="confirmationDay" min="1" max="31" value="25" placeholder="25">
                     <span>日</span>
                 </div>
-                <div class="form-group">
-                    <label>確定時刻:</label>
-                    <input type="time" id="confirmationTime" value="17:00">
-                </div>
             </div>
             <p style="color: #666; font-size: 14px;">
-                例: 25日 17:00に設定すると、毎月25日の17:00に翌月のシフトが確定されます。
+                例: 25日に設定すると、毎月25日に翌月のシフトが確定されます。
             </p>
             <button onclick="saveConfirmationSettings()">確定日設定保存</button>
             <div id="confirmationMessage"></div>
         </div>
 
         <div class="section">
-            <h2>作業種別登録・編集</h2>
-            <form id="taskForm">
-                <input type="hidden" id="taskId">
-                <div class="form-group">
-                    <label>作業ID:</label>
-                    <input type="text" id="taskCode" placeholder="例: milking" required>
-                </div>
-                <div class="form-group">
-                    <label>作業名:</label>
-                    <input type="text" id="taskName" placeholder="例: 搾乳" required>
-                </div>
-                <div class="form-group">
-                    <label>作業説明:</label>
-                    <textarea id="taskDescription" placeholder="作業の詳細説明を入力してください"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>標準作業時間 (分):</label>
-                    <input type="number" id="taskDuration" placeholder="例: 120" min="1">
-                </div>
-                <div class="form-group">
-                    <label>必要人数:</label>
-                    <input type="number" id="taskRequiredPeople" placeholder="例: 2" min="1" value="1">
-                </div>
-                <div class="form-group">
-                    <label>優先度:</label>
-                    <select id="taskPriority">
-                        <option value="high">高</option>
-                        <option value="medium" selected>中</option>
-                        <option value="low">低</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>推奨開始時間:</label>
-                    <div class="time-input">
-                        <input type="time" id="taskStartTime">
-                        <span>〜</span>
-                        <input type="time" id="taskEndTime">
+            <h2>作業種別</h2>
+            <button id="addTaskBtn" onclick="openTaskModalForAdd()">追加</button>
+        </div>
+
+        <!-- Task modal -->
+        <div id="taskModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeTaskModal()">&times;</span>
+                <h3>作業種別登録・編集</h3>
+                <form id="taskForm">
+                    <input type="hidden" id="taskId">
+                    <div class="form-group">
+                        <label>作業ID: <small>（自動生成・編集不可）</small></label>
+                        <input type="text" id="taskCode" placeholder="自動生成されます" readonly>
                     </div>
-                </div>
-                <button type="submit" id="submitBtn">作業種別登録</button>
-                <button type="button" onclick="resetForm()">リセット</button>
-            </form>
-            <div id="formMessage"></div>
+                    <div class="form-group">
+                        <label>作業名:</label>
+                        <input type="text" id="taskName" placeholder="例: 搾乳" required>
+                    </div>
+                    <div class="form-group">
+                        <label>作業説明:</label>
+                        <textarea id="taskDescription" placeholder="作業の詳細説明を入力してください"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>推奨開始時間:</label>
+                        <div class="time-input">
+                            <input type="time" id="taskStartTime">
+                            <span>〜</span>
+                            <input type="time" id="taskEndTime">
+                        </div>
+                    </div>
+                    <button type="submit" id="submitBtn">作業種別登録</button>
+                    <button type="button" onclick="resetForm()">リセット</button>
+                    <button type="button" id="cancelModalBtn" onclick="closeTaskModal()">キャンセル</button>
+                </form>
+                <div id="formMessage"></div>
+            </div>
         </div>
 
         <div class="section">
@@ -255,7 +273,7 @@
 
         <div class="section">
             <h2>作業種別一覧</h2>
-            <button onclick="loadTasks()">一覧更新</button>
+            <button id="addTaskListBtn" onclick="openTaskModalForAdd()">追加</button>
             <div id="taskList" class="task-grid"></div>
         </div>
     </div>
@@ -266,19 +284,45 @@
         // 作業種別登録・更新
         document.getElementById('taskForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
+            const taskType = document.getElementById('taskCode').value.trim();
+            const taskName = document.getElementById('taskName').value.trim();
+            const isEdit = document.getElementById('taskId').value;
+
+            // Basic validation
+            if (!taskName) { showMessage('error', '作業名を入力してください'); return; }
+
+            // Ensure we have a taskType (auto-generated from name if necessary)
+            let genTaskType = document.getElementById('taskCode').value.trim();
+            if (!genTaskType) genTaskType = generateTaskIdFromName(taskName);
+
+            // If adding new (or changing ID during edit), check for duplicate ID
+            if (!isEdit || (isEdit && genTaskType !== isEdit)) {
+                try {
+                    const checkRes = await fetch(`${API_BASE}/tasks/${encodeURIComponent(genTaskType)}`);
+                    if (checkRes.ok) {
+                        showMessage('error', '入力された作業IDは既に存在します');
+                        return;
+                    }
+                    // if not ok and status isn't 404, we treat as potential error
+                    if (checkRes.status && checkRes.status !== 404) {
+                        showMessage('error', '作業ID確認時にエラーが発生しました');
+                        return;
+                    }
+                } catch (err) {
+                    showMessage('error', '作業ID確認時にネットワークエラーが発生しました');
+                    return;
+                }
+            }
+
             const data = {
-                task_type: document.getElementById('taskCode').value,
-                name: document.getElementById('taskName').value,
+                task_type: taskType,
+                name: taskName,
                 description: document.getElementById('taskDescription').value,
-                duration_minutes: parseInt(document.getElementById('taskDuration').value) || 60,
-                required_people: parseInt(document.getElementById('taskRequiredPeople').value) || 1,
-                priority: document.getElementById('taskPriority').value,
                 recommended_start_time: document.getElementById('taskStartTime').value,
                 recommended_end_time: document.getElementById('taskEndTime').value
             };
 
-            const isEdit = document.getElementById('taskId').value;
             const method = isEdit ? 'PUT' : 'POST';
             const url = isEdit ? `${API_BASE}/tasks/${isEdit}` : `${API_BASE}/tasks`;
 
@@ -291,10 +335,13 @@
                 
                 if (response.ok) {
                     showMessage('success', isEdit ? '作業種別を更新しました' : '作業種別を登録しました');
+                    // Close modal and refresh list
+                    try { closeTaskModal(); } catch(e) {}
                     resetForm();
                     loadTasks();
                 } else {
-                    throw new Error('操作に失敗しました');
+                    const errText = await response.text().catch(()=>null);
+                    throw new Error(errText || '操作に失敗しました');
                 }
             } catch (error) {
                 showMessage('error', `エラー: ${error.message}`);
@@ -323,15 +370,6 @@
                             <strong>説明:</strong> ${task.description || '未設定'}
                         </div>
                         <div class="task-info">
-                            <strong>標準時間:</strong> ${task.duration_minutes || 60}分
-                        </div>
-                        <div class="task-info">
-                            <strong>必要人数:</strong> ${task.required_people || 1}人
-                        </div>
-                        <div class="task-info">
-                            <strong>優先度:</strong> ${getPriorityName(task.priority)}
-                        </div>
-                        <div class="task-info">
                             <strong>作業時間:</strong> ${task.duration_minutes || 60}分
                         </div>
                         <button onclick="editTask('${task.task_type}')">編集</button>
@@ -344,6 +382,29 @@
             }
         }
 
+        // Generate a task id (romanized slug) from the task name
+        function generateTaskIdFromName(name) {
+            name = (name || '').trim();
+            if (!name) return '';
+            // common Japanese -> english mapping
+            const map = {
+                '搾乳': 'milking',
+                '給餌': 'feeding',
+                '清掃': 'cleaning',
+                '見回り': 'patrol',
+                '点検': 'maintenance',
+                '健康チェック': 'health_check'
+            };
+            if (map[name]) return map[name];
+            // fallback: normalize to ASCII and slugify
+            try {
+                const normalized = name.normalize('NFKD').replace(/[^\w\s-]/g, '');
+                return normalized.replace(/\s+/g, '_').toLowerCase();
+            } catch (e) {
+                return name.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').toLowerCase();
+            }
+        }
+
         // 作業種別編集
         function editTask(taskType) {
             fetch(`${API_BASE}/tasks/${taskType}`)
@@ -351,19 +412,28 @@
                 .then(task => {
                     document.getElementById('taskId').value = task.task_type;
                     document.getElementById('taskCode').value = task.task_type;
+                    document.getElementById('taskCode').readOnly = true;
                     document.getElementById('taskName').value = task.name;
                     document.getElementById('taskDescription').value = task.description || '';
-                    document.getElementById('taskDuration').value = task.duration_minutes || 60;
-                    document.getElementById('taskRequiredPeople').value = task.required_people || 1;
-                    document.getElementById('taskPriority').value = task.priority || 'medium';
+                    document.getElementById('taskDuration') && (document.getElementById('taskDuration').value = task.duration_minutes || 60);
                     document.getElementById('taskStartTime').value = task.recommended_start_time || '';
                     document.getElementById('taskEndTime').value = task.recommended_end_time || '';
                     
                     document.getElementById('submitBtn').textContent = '作業種別更新';
-                    window.scrollTo(0, 0);
+                    // Open modal for editing
+                    document.getElementById('taskModal').style.display = 'block';
                 })
                 .catch(error => showMessage('error', `エラー: ${error.message}`));
         }
+
+        // When creating new task, generate taskCode from name input
+        document.getElementById('taskName').addEventListener('input', (e) => {
+            const isEdit = document.getElementById('taskId').value;
+            if (!isEdit) {
+                const gen = generateTaskIdFromName(e.target.value);
+                document.getElementById('taskCode').value = gen;
+            }
+        });
 
         // 作業種別削除
         async function deleteTask(taskType) {
@@ -389,9 +459,20 @@
         function resetForm() {
             document.getElementById('taskForm').reset();
             document.getElementById('taskId').value = '';
-            document.getElementById('taskRequiredPeople').value = '1';
-            document.getElementById('taskPriority').value = 'medium';
             document.getElementById('submitBtn').textContent = '作業種別登録';
+        }
+
+        // Open modal for adding a new task
+        function openTaskModalForAdd() {
+            resetForm();
+            document.getElementById('taskModal').style.display = 'block';
+        }
+
+        // Close task modal and clear form
+        function closeTaskModal() {
+            const modal = document.getElementById('taskModal');
+            if (modal) modal.style.display = 'none';
+            try { resetForm(); } catch(e) {}
         }
 
         // メッセージ表示
@@ -414,15 +495,7 @@
             return icons[taskType] || '📋';
         }
 
-        // 優先度名取得
-        function getPriorityName(priority) {
-            const names = {
-                'high': '高',
-                'medium': '中',
-                'low': '低'
-            };
-            return names[priority] || '中';
-        }
+
 
         // ページ読み込み時に作業種別一覧を表示
         document.addEventListener('DOMContentLoaded', () => {
@@ -439,11 +512,7 @@
                 { task_type: 'patrol', name: '見回り', description: '牛の健康状態確認', duration_minutes: 30, required_people: 1, priority: 'medium', recommended_start_time: '14:00', recommended_end_time: '14:30' }
             ];
             
-            // デフォルト作業種別追加ボタンを作成
-            const addDefaultBtn = document.createElement('button');
-            addDefaultBtn.textContent = 'デフォルト作業種別を追加';
-            addDefaultBtn.onclick = () => addDefaultTasks(defaultTasks);
-            document.querySelector('.section:last-child h2').after(addDefaultBtn);
+
         });
 
         // グローバルデフォルト人数設定読み込み
@@ -520,7 +589,6 @@
         // シフト確定日設定保存
         async function saveConfirmationSettings() {
             const day = parseInt(document.getElementById('confirmationDay').value);
-            const time = document.getElementById('confirmationTime').value;
             
             if (!day || day < 1 || day > 31) {
                 showMessage('confirmationMessage', 'error', '有効な日付を入力してください（1-31）');
@@ -528,8 +596,7 @@
             }
 
             const data = {
-                confirmation_day: day,
-                confirmation_time: time
+                confirmation_day: day
             };
 
             try {
@@ -556,7 +623,6 @@
                 if (response.ok) {
                     const settings = await response.json();
                     document.getElementById('confirmationDay').value = settings.confirmation_day || 25;
-                    document.getElementById('confirmationTime').value = settings.confirmation_time || '17:00';
                 }
             } catch (error) {
                 console.log('確定日設定なし');

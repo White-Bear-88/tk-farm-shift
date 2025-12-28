@@ -1,4 +1,5 @@
 import sys, os, json, importlib
+os.environ.setdefault('TABLE_NAME', 'TEST_TABLE')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 import shift_crud
 importlib.reload(shift_crud)
@@ -57,3 +58,24 @@ def test_update_shift_reassigns_employee(monkeypatch):
     assert res['statusCode'] == 200
     assert dummy.put_called is True
     assert dummy.delete_called is True
+
+
+def test_get_shifts_for_employee_by_month(monkeypatch):
+    dummy = DummyTable()
+    # prepare an item with GSI fields
+    dummy.items = {}
+    pk = 'SHIFT#2025-12-01'
+    sk = 'EMP#E1#milking'
+    dummy.items[(pk, sk)] = {
+        'PK': pk, 'SK': sk, 'GSI1PK': 'E1', 'GSI1SK': '2025-12-01', 'start_time': '05:00', 'end_time': '07:00'
+    }
+    monkeypatch.setattr(shift_crud, 'table', dummy)
+
+    event = {'path': '/employees/E1/shifts', 'queryStringParameters': {'month': '2025-12'}}
+    res = shift_crud.get_shifts_for_employee(event)
+    assert res['statusCode'] == 200
+    body = json.loads(res['body'])
+    assert isinstance(body, list)
+    assert len(body) == 1
+    assert body[0]['employee_id'] == 'E1'
+    assert body[0]['date'] == '2025-12-01'

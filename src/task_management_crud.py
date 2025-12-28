@@ -69,13 +69,56 @@ def get_all_tasks():
             'body': json.dumps({'error': str(e)})
         }
 
+def to_task_id(name):
+    # Small mapping for known Japanese names -> ids, fallback to ASCII slug
+    mapping = {
+        '搾乳': 'milking',
+        '給餌': 'feeding',
+        '清掃': 'cleaning',
+        '見回り': 'patrol',
+        '点検': 'maintenance',
+        '健康チェック': 'health_check'
+    }
+    if not name:
+        return ''
+    if name in mapping:
+        return mapping[name]
+    try:
+        import unicodedata
+        norm = unicodedata.normalize('NFKD', name)
+        ascii_only = ''.join([c for c in norm if ord(c) < 128])
+        slug = ''.join([c if c.isalnum() else '_' for c in ascii_only]).strip('_').lower()
+        if slug:
+            return slug
+    except Exception:
+        pass
+    # fallback: replace non word chars
+    return ''.join([c if c.isalnum() else '_' for c in name]).strip('_').lower()
+
+
 def create_task(event):
     try:
         data = json.loads(event['body'])
+        # If task_type not provided, generate from name
+        task_type = data.get('task_type') or to_task_id(data.get('name'))
+        if not task_type:
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'task_type could not be generated'})
+            }
+        # Check duplicate
+        existing = table.get_item(Key={'PK': 'TASK', 'SK': task_type})
+        if existing.get('Item'):
+            return {
+                'statusCode': 409,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'task_type already exists'})
+            }
         
         item = {
             'PK': 'TASK',
-            'SK': data['task_type'],
+            'SK': task_type,
             'name': data['name'],
             'description': data.get('description', ''),
             'duration_minutes': data.get('duration_minutes', 60),
@@ -90,7 +133,7 @@ def create_task(event):
         return {
             'statusCode': 201,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'message': '作業種別を作成しました', 'task_type': data['task_type']})
+            'body': json.dumps({'message': '作業種別を作成しました', 'task_type': task_type})
         }
     except Exception as e:
         return {

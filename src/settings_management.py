@@ -220,15 +220,14 @@ def get_confirmation_settings():
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
                 'body': json.dumps({
-                    'confirmation_day': response['Item'].get('confirmation_day', 25),
-                    'confirmation_time': response['Item'].get('confirmation_time', '17:00')
+                    'confirmation_day': response['Item'].get('confirmation_day', 25)
                 })
             }
         else:
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps({'confirmation_day': 25, 'confirmation_time': '17:00'})
+                'body': json.dumps({'confirmation_day': 25})
             }
     except Exception as e:
         return {
@@ -243,8 +242,7 @@ def save_confirmation_settings(event):
     item = {
         'PK': 'SETTINGS',
         'SK': 'CONFIRMATION',
-        'confirmation_day': data['confirmation_day'],
-        'confirmation_time': data['confirmation_time']
+        'confirmation_day': data['confirmation_day']
     }
     
     table.put_item(Item=item)

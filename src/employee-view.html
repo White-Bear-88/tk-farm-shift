@@ -202,6 +202,18 @@
             </div>
         </div>
 
+        <div class="section">
+            <div class="nav-buttons">
+                <h2>シフトカレンダー</h2>
+                <div class="month-nav">
+                    <button onclick="changeMonth(-1)">← 前月</button>
+                    <span id="currentMonth"></span>
+                    <button onclick="changeMonth(1)">次月 →</button>
+                </div>
+            </div>
+            <div class="calendar" id="calendar"></div>
+        </div>
+
         <div class="employee-info" id="employeeInfo" style="display: none;">
             <h3 id="employeeName"></h3>
             <div class="vacation-status">
@@ -218,18 +230,6 @@
                     <div>年間有給日数</div>
                 </div>
             </div>
-        </div>
-
-        <div class="section">
-            <div class="nav-buttons">
-                <h2>シフトカレンダー</h2>
-                <div class="month-nav">
-                    <button onclick="changeMonth(-1)">← 前月</button>
-                    <span id="currentMonth"></span>
-                    <button onclick="changeMonth(1)">次月 →</button>
-                </div>
-            </div>
-            <div class="calendar" id="calendar"></div>
         </div>
 
         <div class="section">
@@ -256,10 +256,7 @@
             <div id="vacationMessage"></div>
         </div>
 
-        <div class="section">
-            <h2>申請中の休暇</h2>
-            <div id="vacationRequests" class="vacation-requests"></div>
-        </div>
+
     </div>
 
     <script>
@@ -299,7 +296,6 @@
             if (selectedEmployeeId) {
                 loadEmployeeInfo();
                 updateCalendar();
-                loadVacationRequests();
             } else {
                 document.getElementById('employeeInfo').style.display = 'none';
             }
@@ -479,7 +475,6 @@
                     showMessage('休暇申請を送信しました', 'success');
                     document.getElementById('vacationForm').reset();
                     updateCalendar();
-                    loadVacationRequests();
                     loadEmployeeInfo(); // 有給残日数更新
                 } else {
                     throw new Error('申請に失敗しました');
@@ -489,53 +484,9 @@
             }
         });
 
-        // 休暇申請一覧読み込み
-        async function loadVacationRequests() {
-            if (!selectedEmployeeId) return;
-            
-            try {
-                const response = await fetch(`${API_BASE}/employees/${selectedEmployeeId}/vacation-requests`);
-                const requests = await response.json();
-                
-                const container = document.getElementById('vacationRequests');
-                if (requests.length === 0) {
-                    container.innerHTML = '<p>申請中の休暇はありません</p>';
-                    return;
-                }
-                
-                container.innerHTML = requests.map(req => `
-                    <div class="request-card">
-                        <h4>${req.date} - ${getVacationTypeName(req.type)}</h4>
-                        <p><strong>理由:</strong> ${req.reason || '未記入'}</p>
-                        <p><strong>状態:</strong> ${getStatusName(req.status)}</p>
-                        ${req.status === 'pending' ? `<button class="btn-danger" onclick="cancelRequest('${req.id}')">申請取消</button>` : ''}
-                    </div>
-                `).join('');
-            } catch (error) {
-                console.error('休暇申請読み込みエラー:', error);
-            }
-        }
 
-        // 申請取消
-        async function cancelRequest(requestId) {
-            if (!confirm('この申請を取り消しますか？')) return;
-            
-            try {
-                const response = await fetch(`${API_BASE}/vacation-requests/${requestId}`, {
-                    method: 'DELETE'
-                });
-                
-                if (response.ok) {
-                    showMessage('申請を取り消しました', 'success');
-                    loadVacationRequests();
-                    updateCalendar();
-                } else {
-                    throw new Error('取消に失敗しました');
-                }
-            } catch (error) {
-                showMessage(`エラー: ${error.message}`, 'error');
-            }
-        }
+
+
 
         // メッセージ表示
         function showMessage(message, type = 'success') {
