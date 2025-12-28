@@ -347,16 +347,17 @@
         let previewShifts = [];
 
         // ページ読み込み時の初期化
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             // suppressModalOnLoad を初期化して、ナビ遷移時の不意なモーダル表示を防ぐ
             window.suppressModalOnLoad = true;
 
-            loadEmployees();
-            loadTasks();
+            // 非同期処理の完了を待つ
+            await loadEmployees();
+            await loadTasks();
             setDefaultDates();
             // 初回表示は必ず今月をセット
             setCurrentMonth();
-            updateShiftCalendar();
+            await updateShiftCalendar();
             // ボタン状態を更新（過去月なら自動生成を無効にする）
             updateGenerateButtons();
             // Ensure modal is explicitly hidden on initial load (prevent accidental auto-open)

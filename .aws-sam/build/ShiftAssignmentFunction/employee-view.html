@@ -356,13 +356,24 @@
             let vacations = [];
             if (selectedEmployeeId) {
                 try {
-                    const shiftResponse = await fetch(`${API_BASE}/employees/${selectedEmployeeId}/shifts?month=${year}-${String(month + 1).padStart(2, '0')}`);
-                    shifts = await shiftResponse.json();
+                    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+                    const shiftUrl = `${API_BASE}/employees/${selectedEmployeeId}/shifts?month=${monthStr}`;
+                    console.log('Fetching shifts from:', shiftUrl);
+                    const shiftResponse = await fetch(shiftUrl);
+                    if (!shiftResponse.ok) {
+                        console.error('Shift API response not ok:', shiftResponse.status);
+                        shifts = [];
+                    } else {
+                        shifts = await shiftResponse.json() || [];
+                        console.log('Shifts loaded:', shifts);
+                    }
                     
-                    const vacationResponse = await fetch(`${API_BASE}/employees/${selectedEmployeeId}/vacations?month=${year}-${String(month + 1).padStart(2, '0')}`);
-                    vacations = await vacationResponse.json();
+                    // 休暇情報はAPIがないため、空配列として初期化
+                    vacations = [];
                 } catch (error) {
                     console.error('データ読み込みエラー:', error);
+                    shifts = [];
+                    vacations = [];
                 }
             }
             

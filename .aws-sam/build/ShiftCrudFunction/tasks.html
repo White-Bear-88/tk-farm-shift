@@ -204,7 +204,7 @@
             <p style="color: #666; font-size: 14px;">
                 例: 25日に設定すると、毎月25日に翌月のシフトが確定されます。
             </p>
-            <button onclick="saveConfirmationSettings()">確定日設定保存</button>
+            <button onclick="saveConfirmationSettings()">保存</button>
             <div id="confirmationMessage"></div>
         </div>
 
@@ -216,33 +216,6 @@
             <div id="globalDefaultRequirements"></div>
             <button onclick="saveGlobalDefaultRequirements()">保存</button>
             <div id="globalDefaultMessage"></div>
-        </div>
-
-        <div class="section">
-            <h2>月別作業人数設定</h2>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>対象月:</label>
-                    <input type="month" id="defaultMonth" required>
-                </div>
-            </div>
-            <div id="defaultRequirements"></div>
-            <button onclick="saveDefaultRequirements()">月別人数保存</button>
-            <div id="defaultMessage"></div>
-        </div>
-
-        <div class="section">
-            <h2>日別作業人数設定</h2>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>対象日:</label>
-                    <input type="date" id="specificDate" required>
-                </div>
-            </div>
-            <div id="dailyRequirements"></div>
-            <button onclick="saveDailyRequirements()">日別人数保存</button>
-            <button onclick="loadDailyRequirements()">日別人数読み込み</button>
-            <div id="dailyMessage"></div>
         </div>
 
         <div class="section">
@@ -484,8 +457,6 @@
         // Page init
         document.addEventListener('DOMContentLoaded', () => {
             loadTasks();
-            setDefaultDate();
-            setDefaultMonth();
             loadConfirmationSettings();
             loadGlobalDefaultRequirements();
             
@@ -596,7 +567,11 @@
                 });
                 
                 if (response.ok) {
-                    showMessage('confirmationMessage', 'success', 'シフト確定日を設定しました');
+                    showMessage('confirmationMessage', 'success', '✓ シフト確定日を設定しました');
+                    // メッセージを3秒後に消去
+                    setTimeout(() => {
+                        document.getElementById('confirmationMessage').innerHTML = '';
+                    }, 3000);
                 } else {
                     throw new Error('設定に失敗しました');
                 }
@@ -617,175 +592,6 @@
                 console.log('確定日設定なし');
             }
         }
-
-        // 日別人数設定の初期化
-        function setDefaultDate() {
-            document.getElementById('specificDate').value = new Date().toISOString().split('T')[0];
-            loadDailyRequirements();
-        }
-
-        // 月別デフォルト人数設定の初期化
-        function setDefaultMonth() {
-            const now = new Date();
-            document.getElementById('defaultMonth').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            loadDefaultRequirements();
-        }
-
-        // 月別デフォルト人数設定読み込み
-        async function loadDefaultRequirements() {
-            try {
-                const tasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
-                const month = document.getElementById('defaultMonth').value;
-                
-                let defaults = {};
-                try {
-                    const response = await fetch(`${API_BASE}/requirements/default/${month}`);
-                    if (response.ok) {
-                        defaults = await response.json();
-                    }
-                } catch (error) {
-                    console.log('デフォルト設定なし');
-                }
-
-                const container = document.getElementById('defaultRequirements');
-                container.innerHTML = tasks.map(task => `
-                    <div class="requirement-item">
-                        <label>${task.name}:</label>
-                        <input type="number" min="0" value="${defaults[task.task_type] || task.required_people || 1}" 
-                               data-task="${task.task_type}">
-                        <span>人</span>
-                    </div>
-                `).join('');
-            } catch (error) {
-                console.error('デフォルト人数読み込みエラー:', error);
-            }
-        }
-
-        // 日別人数設定読み込み
-        async function loadDailyRequirements() {
-            try {
-                const tasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
-                const date = document.getElementById('specificDate').value;
-                
-                let dailyReqs = {};
-                let defaults = {};
-                
-                // 日別設定を取得
-                try {
-                    const response = await fetch(`${API_BASE}/requirements/daily/${date}`);
-                    if (response.ok) {
-                        dailyReqs = await response.json();
-                    }
-                } catch (error) {
-                    console.log('日別設定なし');
-                }
-                
-                // デフォルト設定を取得
-                const month = date.substring(0, 7);
-                try {
-                    const response = await fetch(`${API_BASE}/requirements/default/${month}`);
-                    if (response.ok) {
-                        defaults = await response.json();
-                    }
-                } catch (error) {
-                    console.log('デフォルト設定なし');
-                }
-
-                const container = document.getElementById('dailyRequirements');
-                container.innerHTML = tasks.map(task => {
-                    const value = dailyReqs[task.task_type] || defaults[task.task_type] || task.required_people || 1;
-                    const isCustom = dailyReqs[task.task_type] !== undefined;
-                    return `
-                        <div class="requirement-item">
-                            <label>${task.name}:</label>
-                            <input type="number" min="0" value="${value}" 
-                                   data-task="${task.task_type}" 
-                                   style="${isCustom ? 'border-color: #007bff; background: #e3f2fd;' : ''}">
-                            <span>人</span>
-                            ${isCustom ? '<span style="color: #007bff; font-size: 12px;">個別設定</span>' : '<span style="color: #666; font-size: 12px;">デフォルト</span>'}
-                        </div>
-                    `;
-                }).join('');
-            } catch (error) {
-                console.error('日別人数読み込みエラー:', error);
-            }
-        }
-
-        // 月別デフォルト人数保存
-        async function saveDefaultRequirements() {
-            const month = document.getElementById('defaultMonth').value;
-            const requirements = {};
-            let totalRequired = 0;
-            
-            document.querySelectorAll('#defaultRequirements input[data-task]').forEach(input => {
-                const count = parseInt(input.value) || 0;
-                requirements[input.dataset.task] = count;
-                totalRequired += count;
-            });
-
-            // 従業員総数を取得してチェック
-            try {
-                const employeesResponse = await fetch(`${API_BASE}/employees`);
-                const employees = await employeesResponse.json();
-                const totalEmployees = employees.length;
-                
-                if (totalRequired > totalEmployees) {
-                    showMessage('defaultMessage', 'error', `必要人数の合計(${totalRequired}人)が従業員総数(${totalEmployees}人)を超えています`);
-                    return;
-                }
-            } catch (error) {
-                console.error('従業員数取得エラー:', error);
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/requirements/default/${month}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requirements)
-                });
-                
-                if (response.ok) {
-                    showMessage('defaultMessage', 'success', 'デフォルト人数を保存しました');
-                } else {
-                    throw new Error('保存に失敗しました');
-                }
-            } catch (error) {
-                showMessage('defaultMessage', 'error', `エラー: ${error.message}`);
-            }
-        }
-
-        // 日別人数保存
-        async function saveDailyRequirements() {
-            const date = document.getElementById('specificDate').value;
-            const requirements = {};
-            
-            document.querySelectorAll('#dailyRequirements input[data-task]').forEach(input => {
-                requirements[input.dataset.task] = parseInt(input.value) || 0;
-            });
-
-            try {
-                const response = await fetch(`${API_BASE}/requirements/daily/${date}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requirements)
-                });
-                
-                if (response.ok) {
-                    showMessage('dailyMessage', 'success', '日別人数を保存しました');
-                    loadDailyRequirements(); // 再読み込みして表示を更新
-                } else {
-                    throw new Error('保存に失敗しました');
-                }
-            } catch (error) {
-                showMessage('dailyMessage', 'error', `エラー: ${error.message}`);
-            }
-        }
-
-        // 月変更時のイベント
-        document.getElementById('defaultMonth').addEventListener('change', loadDefaultRequirements);
-
-        // 日付変更時のイベント
-        document.getElementById('specificDate').addEventListener('change', loadDailyRequirements);
 
         // デフォルト作業種別追加
         async function addDefaultTasks(tasks) {
