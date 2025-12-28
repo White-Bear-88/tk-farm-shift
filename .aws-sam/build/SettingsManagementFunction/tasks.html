@@ -219,6 +219,33 @@
         </div>
 
         <div class="section">
+            <h2>月別作業人数設定</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>対象月:</label>
+                    <input type="month" id="defaultMonth" required>
+                </div>
+            </div>
+            <div id="defaultRequirements"></div>
+            <button onclick="saveDefaultRequirements()">月別人数保存</button>
+            <div id="defaultMessage"></div>
+        </div>
+
+        <div class="section">
+            <h2>日別作業人数設定</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>対象日:</label>
+                    <input type="date" id="specificDate" required>
+                </div>
+            </div>
+            <div id="dailyRequirements"></div>
+            <button onclick="saveDailyRequirements()">日別人数保存</button>
+            <button onclick="loadDailyRequirements()">日別人数読み込み</button>
+            <div id="dailyMessage"></div>
+        </div>
+
+        <div class="section">
             <h2>作業種別一覧</h2>
             <button id="addTaskListBtn" onclick="openTaskModalForAdd()">追加</button>
             <div id="taskList" class="task-grid"></div>
@@ -458,6 +485,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadTasks();
             setDefaultDate();
+            setDefaultMonth();
             loadConfirmationSettings();
             loadGlobalDefaultRequirements();
             
@@ -590,6 +618,12 @@
             }
         }
 
+        // 日別人数設定の初期化
+        function setDefaultDate() {
+            document.getElementById('specificDate').value = new Date().toISOString().split('T')[0];
+            loadDailyRequirements();
+        }
+
         // 月別デフォルト人数設定の初期化
         function setDefaultMonth() {
             const now = new Date();
@@ -624,6 +658,56 @@
                 `).join('');
             } catch (error) {
                 console.error('デフォルト人数読み込みエラー:', error);
+            }
+        }
+
+        // 日別人数設定読み込み
+        async function loadDailyRequirements() {
+            try {
+                const tasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
+                const date = document.getElementById('specificDate').value;
+                
+                let dailyReqs = {};
+                let defaults = {};
+                
+                // 日別設定を取得
+                try {
+                    const response = await fetch(`${API_BASE}/requirements/daily/${date}`);
+                    if (response.ok) {
+                        dailyReqs = await response.json();
+                    }
+                } catch (error) {
+                    console.log('日別設定なし');
+                }
+                
+                // デフォルト設定を取得
+                const month = date.substring(0, 7);
+                try {
+                    const response = await fetch(`${API_BASE}/requirements/default/${month}`);
+                    if (response.ok) {
+                        defaults = await response.json();
+                    }
+                } catch (error) {
+                    console.log('デフォルト設定なし');
+                }
+
+                const container = document.getElementById('dailyRequirements');
+                container.innerHTML = tasks.map(task => {
+                    const value = dailyReqs[task.task_type] || defaults[task.task_type] || task.required_people || 1;
+                    const isCustom = dailyReqs[task.task_type] !== undefined;
+                    return `
+                        <div class="requirement-item">
+                            <label>${task.name}:</label>
+                            <input type="number" min="0" value="${value}" 
+                                   data-task="${task.task_type}" 
+                                   style="${isCustom ? 'border-color: #007bff; background: #e3f2fd;' : ''}">
+                            <span>人</span>
+                            ${isCustom ? '<span style="color: #007bff; font-size: 12px;">個別設定</span>' : '<span style="color: #666; font-size: 12px;">デフォルト</span>'}
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('日別人数読み込みエラー:', error);
             }
         }
 
@@ -670,8 +754,38 @@
             }
         }
 
+        // 日別人数保存
+        async function saveDailyRequirements() {
+            const date = document.getElementById('specificDate').value;
+            const requirements = {};
+            
+            document.querySelectorAll('#dailyRequirements input[data-task]').forEach(input => {
+                requirements[input.dataset.task] = parseInt(input.value) || 0;
+            });
+
+            try {
+                const response = await fetch(`${API_BASE}/requirements/daily/${date}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requirements)
+                });
+                
+                if (response.ok) {
+                    showMessage('dailyMessage', 'success', '日別人数を保存しました');
+                    loadDailyRequirements(); // 再読み込みして表示を更新
+                } else {
+                    throw new Error('保存に失敗しました');
+                }
+            } catch (error) {
+                showMessage('dailyMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
         // 月変更時のイベント
         document.getElementById('defaultMonth').addEventListener('change', loadDefaultRequirements);
+
+        // 日付変更時のイベント
+        document.getElementById('specificDate').addEventListener('change', loadDailyRequirements);
 
         // デフォルト作業種別追加
         async function addDefaultTasks(tasks) {

@@ -211,6 +211,7 @@
                     <button onclick="changeMonth(1)">次月 →</button>
                 </div>
             </div>
+            <div id="calendarStatus" style="margin-bottom:10px; color:#555;"></div>
             <div class="calendar" id="calendar"></div>
         </div>
 
@@ -330,6 +331,8 @@
             const month = currentDate.getMonth();
             
             document.getElementById('currentMonth').textContent = `${year}年${month + 1}月`;
+            const statusEl = document.getElementById('calendarStatus');
+            if (statusEl) statusEl.textContent = selectedEmployeeId ? '読み込み中…' : '';
             
             const firstDay = new Date(year, month, 1);
             const lastDay = new Date(year, month + 1, 0);
@@ -395,13 +398,15 @@
                 
                 dayDiv.innerHTML = `
                     <div class="day-number">${cellDate.getDate()}</div>
-                    ${dayShifts.map(s => `<div class="shift-info">${getTaskName(s.task_type)} ${s.start_time}-${s.end_time}</div>`).join('')}
+                    ${dayShifts.map(s => `<div class="shift-info">${getTaskName(s.task_type)}</div>`).join('')}
                     ${dayVacations.map(v => `<div class="vacation-info">${getVacationTypeName(v.type)} ${v.status}</div>`).join('')}
                 `;
                 
                 dayDiv.onclick = () => selectDate(dateStr);
                 calendar.appendChild(dayDiv);
             }
+
+            if (statusEl) statusEl.textContent = '';
         }
 
         // 月変更
