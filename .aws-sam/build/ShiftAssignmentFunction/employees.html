@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>従業員管理 - 酪農シフト管理システム</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .back-btn:hover {
+            background: #5a6268;
+        }
+        .section {
+            background: white;
+            margin: 20px 0;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .checkbox-item input[type="checkbox"] {
+            width: auto;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .employee-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .employee-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .employee-card h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .skills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin: 10px 0;
+        }
+        .skill-tag {
+            background: #e9ecef;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #495057;
+        }
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👥 従業員管理</h1>
+            <a href="menu.html" class="back-btn">← メニューに戻る</a>
+        </div>
+
+        <div class="section">
+            <h2>有給休暇デフォルト設定</h2>
+            <div class="form-group">
+                <label>年間有給休暇日数（デフォルト）:</label>
+                <input type="number" id="defaultVacationDays" min="0" value="20" placeholder="20">
+                <span>日</span>
+            </div>
+            <button onclick="saveDefaultVacation()">保存</button>
+            <div id="vacationDefaultMessage"></div>
+        </div>
+
+        <div class="section">
+            <h2>従業員登録・編集</h2>
+            <form id="employeeForm">
+                <input type="hidden" id="employeeId">
+                <div class="form-group">
+                    <label>従業員ID:</label>
+                    <input type="text" id="empId" placeholder="例: 001" required>
+                </div>
+                <div class="form-group">
+                    <label>氏名:</label>
+                    <input type="text" id="empName" placeholder="例: 田中太郎" required>
+                </div>
+                <div class="form-group">
+                    <label>電話番号:</label>
+                    <input type="tel" id="empPhone" placeholder="例: 090-1234-5678">
+                </div>
+                <div class="form-group">
+                    <label>メールアドレス:</label>
+                    <input type="email" id="empEmail" placeholder="例: tanaka@example.com">
+                </div>
+                <div class="form-group">
+                    <label>年間有給休暇日数:</label>
+                    <input type="number" id="empVacationDays" min="0" placeholder="20">
+                    <span>日</span>
+                </div>
+                <div class="form-group">
+                    <label>対応可能な作業:</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="skill-milking" value="milking">
+                            <label for="skill-milking">搾乳</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="skill-feeding" value="feeding">
+                            <label for="skill-feeding">給餌</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="skill-cleaning" value="cleaning">
+                            <label for="skill-cleaning">清掃</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="skill-patrol" value="patrol">
+                            <label for="skill-patrol">見回り</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" id="submitBtn">従業員登録</button>
+                <button type="button" onclick="resetForm()">リセット</button>
+            </form>
+            <div id="formMessage"></div>
+        </div>
+
+        <div class="section">
+            <h2>従業員一覧</h2>
+            <button onclick="loadEmployees()">一覧更新</button>
+            <div id="employeeList" class="employee-list"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev';
+
+        // 従業員登録・更新
+        document.getElementById('employeeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const skills = [];
+            document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                skills.push(cb.value);
+            });
+
+            // デフォルト有給日数を取得
+            let vacationDays = parseInt(document.getElementById('empVacationDays').value);
+            if (isNaN(vacationDays)) {
+                try {
+                    const defaultResponse = await fetch(`${API_BASE}/settings/vacation-default`);
+                    if (defaultResponse.ok) {
+                        const defaultSettings = await defaultResponse.json();
+                        vacationDays = defaultSettings.default_vacation_days || 20;
+                    } else {
+                        vacationDays = 20;
+                    }
+                } catch (error) {
+                    vacationDays = 20;
+                }
+            }
+
+            const data = {
+                employee_id: document.getElementById('empId').value,
+                name: document.getElementById('empName').value,
+                phone: document.getElementById('empPhone').value,
+                email: document.getElementById('empEmail').value,
+                skills: skills,
+                vacation_days: vacationDays
+            };
+
+            const isEdit = document.getElementById('employeeId').value;
+            const method = isEdit ? 'PUT' : 'POST';
+            const url = isEdit ? `${API_BASE}/employees/${isEdit}` : `${API_BASE}/employees`;
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    showMessage('success', isEdit ? '従業員情報を更新しました' : '従業員を登録しました');
+                    resetForm();
+                    loadEmployees();
+                } else {
+                    throw new Error('操作に失敗しました');
+                }
+            } catch (error) {
+                showMessage('error', `エラー: ${error.message}`);
+            }
+        });
+
+        // 従業員一覧読み込み
+        async function loadEmployees() {
+            try {
+                const response = await fetch(`${API_BASE}/employees`);
+                const employees = await response.json();
+                
+                const listDiv = document.getElementById('employeeList');
+                if (employees.length === 0) {
+                    listDiv.innerHTML = '<p>登録された従業員がありません</p>';
+                    return;
+                }
+
+                listDiv.innerHTML = employees.map(emp => `
+                    <div class="employee-card">
+                        <h4>${emp.name} (ID: ${emp.employee_id})</h4>
+                        <p><strong>電話:</strong> ${emp.phone || '未設定'}</p>
+                        <p><strong>メール:</strong> ${emp.email || '未設定'}</p>
+                        <p><strong>有給日数:</strong> ${emp.vacation_days || 20}日</p>
+                        <div class="skills">
+                            ${emp.skills ? emp.skills.map(skill => 
+                                `<span class="skill-tag">${getTaskName(skill)}</span>`
+                            ).join('') : ''}
+                        </div>
+                        <button onclick="editEmployee('${emp.employee_id}')">編集</button>
+                        <button class="btn-danger" onclick="deleteEmployee('${emp.employee_id}')">削除</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('employeeList').innerHTML = 
+                    `<div class="error">エラー: ${error.message}</div>`;
+            }
+        }
+
+        // 従業員編集
+        function editEmployee(employeeId) {
+            // 実際の実装では、APIから従業員詳細を取得
+            fetch(`${API_BASE}/employees/${employeeId}`)
+                .then(response => response.json())
+                .then(emp => {
+                    document.getElementById('employeeId').value = emp.employee_id;
+                    document.getElementById('empId').value = emp.employee_id;
+                    document.getElementById('empName').value = emp.name;
+                    document.getElementById('empPhone').value = emp.phone || '';
+                    document.getElementById('empEmail').value = emp.email || '';
+                    document.getElementById('empVacationDays').value = emp.vacation_days || 20;
+                    
+                    // スキルチェックボックス設定
+                    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                        cb.checked = emp.skills && emp.skills.includes(cb.value);
+                    });
+                    
+                    document.getElementById('submitBtn').textContent = '従業員更新';
+                    window.scrollTo(0, 0);
+                })
+                .catch(error => showMessage('error', `エラー: ${error.message}`));
+        }
+
+        // 従業員削除
+        async function deleteEmployee(employeeId) {
+            if (!confirm('この従業員を削除しますか？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/employees/${employeeId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showMessage('success', '従業員を削除しました');
+                    loadEmployees();
+                } else {
+                    throw new Error('削除に失敗しました');
+                }
+            } catch (error) {
+                showMessage('error', `エラー: ${error.message}`);
+            }
+        }
+
+        // フォームリセット
+        function resetForm() {
+            document.getElementById('employeeForm').reset();
+            document.getElementById('employeeId').value = '';
+            document.getElementById('submitBtn').textContent = '従業員登録';
+        }
+
+        // メッセージ表示
+        function showMessage(type, message) {
+            const messageDiv = document.getElementById('formMessage');
+            messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
+            setTimeout(() => messageDiv.innerHTML = '', 5000);
+        }
+
+        // 作業名変換
+        function getTaskName(taskType) {
+            const names = {
+                'milking': '搾乳',
+                'feeding': '給餌',
+                'cleaning': '清掃',
+                'patrol': '見回り'
+            };
+            return names[taskType] || taskType;
+        }
+
+        // 有給休暇デフォルト設定保存
+        async function saveDefaultVacation() {
+            const days = parseInt(document.getElementById('defaultVacationDays').value);
+            
+            if (isNaN(days) || days < 0) {
+                showMessage('vacationDefaultMessage', 'error', '有効な日数を入力してください');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/settings/vacation-default`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ default_vacation_days: days })
+                });
+                
+                if (response.ok) {
+                    showMessage('vacationDefaultMessage', 'success', '更新しました。');
+                } else {
+                    throw new Error('設定に失敗しました');
+                }
+            } catch (error) {
+                showMessage('vacationDefaultMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
+        // 有給休暇デフォルト設定読み込み
+        async function loadDefaultVacation() {
+            try {
+                const response = await fetch(`${API_BASE}/settings/vacation-default`);
+                if (response.ok) {
+                    const settings = await response.json();
+                    document.getElementById('defaultVacationDays').value = settings.default_vacation_days || 20;
+                }
+            } catch (error) {
+                console.log('デフォルト有給設定なし');
+            }
+        }
+
+        // ページ読み込み時に従業員一覧を表示
+        document.addEventListener('DOMContentLoaded', () => {
+            loadEmployees();
+            loadDefaultVacation();
+        });
+    </script>
+</body>
+</html>
