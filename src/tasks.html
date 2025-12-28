@@ -208,13 +208,24 @@
             <div id="confirmationMessage"></div>
         </div>
 
+
+
+
         <div class="section">
-            <h2>作業種別</h2>
-            <button id="addTaskBtn" onclick="openTaskModalForAdd()">追加</button>
+            <h2>作業人数（デフォルト値）</h2>
+            <div id="globalDefaultRequirements"></div>
+            <button onclick="saveGlobalDefaultRequirements()">保存</button>
+            <div id="globalDefaultMessage"></div>
+        </div>
+
+        <div class="section">
+            <h2>作業種別一覧</h2>
+            <button id="addTaskListBtn" onclick="openTaskModalForAdd()">追加</button>
+            <div id="taskList" class="task-grid"></div>
         </div>
 
         <!-- Task modal -->
-        <div id="taskModal" class="modal">
+        <div id="taskModal" class="modal" style="display:none;">
             <div class="modal-content">
                 <span class="close" onclick="closeTaskModal()">&times;</span>
                 <h3>作業種別登録・編集</h3>
@@ -247,108 +258,89 @@
                 <div id="formMessage"></div>
             </div>
         </div>
-
-        <div class="section">
-            <h2>作業人数（デフォルト値）</h2>
-            <div id="globalDefaultRequirements"></div>
-            <button onclick="saveGlobalDefaultRequirements()">デフォルト人数保存</button>
-            <div id="globalDefaultMessage"></div>
-        </div>
-
-
-
-        <div class="section">
-            <h2>日別作業人数設定</h2>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>対象日:</label>
-                    <input type="date" id="specificDate" required>
-                </div>
-            </div>
-            <div id="dailyRequirements"></div>
-            <button onclick="saveDailyRequirements()">日別人数保存</button>
-            <button onclick="loadDailyRequirements()">日別人数読み込み</button>
-            <div id="dailyMessage"></div>
-        </div>
-
-        <div class="section">
-            <h2>作業種別一覧</h2>
-            <button id="addTaskListBtn" onclick="openTaskModalForAdd()">追加</button>
-            <div id="taskList" class="task-grid"></div>
-        </div>
     </div>
 
     <script>
         const API_BASE = 'https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev';
 
-        // 作業種別登録・更新
-        document.getElementById('taskForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const taskType = document.getElementById('taskCode').value.trim();
-            const taskName = document.getElementById('taskName').value.trim();
-            const isEdit = document.getElementById('taskId').value;
-
-            // Basic validation
-            if (!taskName) { showMessage('error', '作業名を入力してください'); return; }
-
-            // Ensure we have a taskType (auto-generated from name if necessary)
-            let genTaskType = document.getElementById('taskCode').value.trim();
-            if (!genTaskType) genTaskType = generateTaskIdFromName(taskName);
-
-            // If adding new (or changing ID during edit), check for duplicate ID
-            if (!isEdit || (isEdit && genTaskType !== isEdit)) {
-                try {
-                    const checkRes = await fetch(`${API_BASE}/tasks/${encodeURIComponent(genTaskType)}`);
-                    if (checkRes.ok) {
-                        showMessage('error', '入力された作業IDは既に存在します');
-                        return;
-                    }
-                    // if not ok and status isn't 404, we treat as potential error
-                    if (checkRes.status && checkRes.status !== 404) {
-                        showMessage('error', '作業ID確認時にエラーが発生しました');
-                        return;
-                    }
-                } catch (err) {
-                    showMessage('error', '作業ID確認時にネットワークエラーが発生しました');
-                    return;
-                }
-            }
-
-            const data = {
-                task_type: taskType,
-                name: taskName,
-                description: document.getElementById('taskDescription').value,
-                recommended_start_time: document.getElementById('taskStartTime').value,
-                recommended_end_time: document.getElementById('taskEndTime').value
+        // Generate a unique task id from name (romanized + timestamp if needed)
+        function generateTaskIdFromName(name) {
+            name = (name || '').trim();
+            if (!name) return '';
+            const map = {
+                '搾乳': 'milking',
+                '給餌': 'feeding',
+                '清掃': 'cleaning',
+                '見回り': 'patrol',
+                '点検': 'maintenance',
+                '健康チェック': 'health_check'
             };
-
-            const method = isEdit ? 'PUT' : 'POST';
-            const url = isEdit ? `${API_BASE}/tasks/${isEdit}` : `${API_BASE}/tasks`;
-
+            if (map[name]) return map[name];
             try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                if (response.ok) {
-                    showMessage('success', isEdit ? '作業種別を更新しました' : '作業種別を登録しました');
-                    // Close modal and refresh list
-                    try { closeTaskModal(); } catch(e) {}
-                    resetForm();
-                    loadTasks();
-                } else {
-                    const errText = await response.text().catch(()=>null);
-                    throw new Error(errText || '操作に失敗しました');
-                }
-            } catch (error) {
-                showMessage('error', `エラー: ${error.message}`);
+                const normalized = name.normalize('NFKD').replace(/[^\w\s-]/g, '');
+                return normalized.replace(/\s+/g, '_').toLowerCase();
+            } catch (e) {
+                return name.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').toLowerCase();
             }
+        }
+
+        // Task form submit
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('taskForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const taskName = document.getElementById('taskName').value.trim();
+                const isEdit = document.getElementById('taskId').value;
+
+                if (!taskName) { showMessage('error', '作業名を入力してください'); return; }
+
+                // Auto-generate ID from name (server will ensure uniqueness)
+                let genTaskType = generateTaskIdFromName(taskName);
+                if (!genTaskType) genTaskType = 'task_' + Date.now();
+
+                const data = {
+                    task_type: genTaskType,
+                    name: taskName,
+                    description: document.getElementById('taskDescription').value,
+                    recommended_start_time: document.getElementById('taskStartTime').value,
+                    recommended_end_time: document.getElementById('taskEndTime').value
+                };
+
+                const method = isEdit ? 'PUT' : 'POST';
+                const url = isEdit ? `${API_BASE}/tasks/${isEdit}` : `${API_BASE}/tasks`;
+
+                try {
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        showMessage('success', isEdit ? '作業種別を更新しました' : '作業種別を登録しました');
+                        closeTaskModal();
+                        resetForm();
+                        loadTasks();
+                    } else {
+                        const errText = await response.text().catch(()=>null);
+                        throw new Error(errText || '操作に失敗しました');
+                    }
+                } catch (error) {
+                    showMessage('error', `エラー: ${error.message}`);
+                }
+            });
+
+            // Auto-fill taskCode as user types name
+            document.getElementById('taskName').addEventListener('input', (e) => {
+                const isEdit = document.getElementById('taskId').value;
+                if (!isEdit) {
+                    const gen = generateTaskIdFromName(e.target.value) || 'task_' + Date.now();
+                    document.getElementById('taskCode').value = gen;
+                }
+            });
         });
 
-        // 作業種別一覧読み込み
+        // Load tasks list
         async function loadTasks() {
             try {
                 const response = await fetch(`${API_BASE}/tasks`);
@@ -369,9 +361,6 @@
                         <div class="task-info">
                             <strong>説明:</strong> ${task.description || '未設定'}
                         </div>
-                        <div class="task-info">
-                            <strong>作業時間:</strong> ${task.duration_minutes || 60}分
-                        </div>
                         <button onclick="editTask('${task.task_type}')">編集</button>
                         <button class="btn-danger" onclick="deleteTask('${task.task_type}')">削除</button>
                     </div>
@@ -382,68 +371,28 @@
             }
         }
 
-        // Generate a task id (romanized slug) from the task name
-        function generateTaskIdFromName(name) {
-            name = (name || '').trim();
-            if (!name) return '';
-            // common Japanese -> english mapping
-            const map = {
-                '搾乳': 'milking',
-                '給餌': 'feeding',
-                '清掃': 'cleaning',
-                '見回り': 'patrol',
-                '点検': 'maintenance',
-                '健康チェック': 'health_check'
-            };
-            if (map[name]) return map[name];
-            // fallback: normalize to ASCII and slugify
-            try {
-                const normalized = name.normalize('NFKD').replace(/[^\w\s-]/g, '');
-                return normalized.replace(/\s+/g, '_').toLowerCase();
-            } catch (e) {
-                return name.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').toLowerCase();
-            }
-        }
-
-        // 作業種別編集
+        // Edit task
         function editTask(taskType) {
             fetch(`${API_BASE}/tasks/${taskType}`)
                 .then(response => response.json())
                 .then(task => {
                     document.getElementById('taskId').value = task.task_type;
                     document.getElementById('taskCode').value = task.task_type;
-                    document.getElementById('taskCode').readOnly = true;
                     document.getElementById('taskName').value = task.name;
                     document.getElementById('taskDescription').value = task.description || '';
-                    document.getElementById('taskDuration') && (document.getElementById('taskDuration').value = task.duration_minutes || 60);
                     document.getElementById('taskStartTime').value = task.recommended_start_time || '';
                     document.getElementById('taskEndTime').value = task.recommended_end_time || '';
-                    
                     document.getElementById('submitBtn').textContent = '作業種別更新';
-                    // Open modal for editing
                     document.getElementById('taskModal').style.display = 'block';
                 })
                 .catch(error => showMessage('error', `エラー: ${error.message}`));
         }
 
-        // When creating new task, generate taskCode from name input
-        document.getElementById('taskName').addEventListener('input', (e) => {
-            const isEdit = document.getElementById('taskId').value;
-            if (!isEdit) {
-                const gen = generateTaskIdFromName(e.target.value);
-                document.getElementById('taskCode').value = gen;
-            }
-        });
-
-        // 作業種別削除
+        // Delete task
         async function deleteTask(taskType) {
             if (!confirm('この作業種別を削除しますか？')) return;
-
             try {
-                const response = await fetch(`${API_BASE}/tasks/${taskType}`, {
-                    method: 'DELETE'
-                });
-                
+                const response = await fetch(`${API_BASE}/tasks/${taskType}`, { method: 'DELETE' });
                 if (response.ok) {
                     showMessage('success', '作業種別を削除しました');
                     loadTasks();
@@ -455,34 +404,34 @@
             }
         }
 
-        // フォームリセット
+        // Reset form
         function resetForm() {
             document.getElementById('taskForm').reset();
             document.getElementById('taskId').value = '';
+            document.getElementById('taskCode').value = '';
             document.getElementById('submitBtn').textContent = '作業種別登録';
         }
 
-        // Open modal for adding a new task
+        // Open modal for add
         function openTaskModalForAdd() {
             resetForm();
             document.getElementById('taskModal').style.display = 'block';
         }
 
-        // Close task modal and clear form
+        // Close modal
         function closeTaskModal() {
-            const modal = document.getElementById('taskModal');
-            if (modal) modal.style.display = 'none';
-            try { resetForm(); } catch(e) {}
+            document.getElementById('taskModal').style.display = 'none';
+            resetForm();
         }
 
-        // メッセージ表示
+        // Show message
         function showMessage(type, message) {
             const messageDiv = document.getElementById('formMessage');
             messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
             setTimeout(() => messageDiv.innerHTML = '', 5000);
         }
 
-        // 作業アイコン取得
+        // Task icon
         function getTaskIcon(taskType) {
             const icons = {
                 'milking': '🥛',
@@ -497,7 +446,15 @@
 
 
 
-        // ページ読み込み時に作業種別一覧を表示
+
+
+
+
+
+
+
+
+        // Page init
         document.addEventListener('DOMContentLoaded', () => {
             loadTasks();
             setDefaultDate();
@@ -577,7 +534,11 @@
                 });
                 
                 if (response.ok) {
-                    showMessage('globalDefaultMessage', 'success', 'デフォルト人数を保存しました');
+                    showMessage('globalDefaultMessage', 'success', '✓ デフォルト人数を保存しました');
+                    // メッセージを3秒後に消去
+                    setTimeout(() => {
+                        document.getElementById('globalDefaultMessage').innerHTML = '';
+                    }, 3000);
                 } else {
                     throw new Error('保存に失敗しました');
                 }
@@ -636,12 +597,6 @@
             loadDefaultRequirements();
         }
 
-        // 日別人数設定の初期化
-        function setDefaultDate() {
-            document.getElementById('specificDate').value = new Date().toISOString().split('T')[0];
-            loadDailyRequirements();
-        }
-
         // 月別デフォルト人数設定読み込み
         async function loadDefaultRequirements() {
             try {
@@ -669,56 +624,6 @@
                 `).join('');
             } catch (error) {
                 console.error('デフォルト人数読み込みエラー:', error);
-            }
-        }
-
-        // 日別人数設定読み込み
-        async function loadDailyRequirements() {
-            try {
-                const tasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
-                const date = document.getElementById('specificDate').value;
-                
-                let dailyReqs = {};
-                let defaults = {};
-                
-                // 日別設定を取得
-                try {
-                    const response = await fetch(`${API_BASE}/requirements/daily/${date}`);
-                    if (response.ok) {
-                        dailyReqs = await response.json();
-                    }
-                } catch (error) {
-                    console.log('日別設定なし');
-                }
-                
-                // デフォルト設定を取得
-                const month = date.substring(0, 7);
-                try {
-                    const response = await fetch(`${API_BASE}/requirements/default/${month}`);
-                    if (response.ok) {
-                        defaults = await response.json();
-                    }
-                } catch (error) {
-                    console.log('デフォルト設定なし');
-                }
-
-                const container = document.getElementById('dailyRequirements');
-                container.innerHTML = tasks.map(task => {
-                    const value = dailyReqs[task.task_type] || defaults[task.task_type] || task.required_people || 1;
-                    const isCustom = dailyReqs[task.task_type] !== undefined;
-                    return `
-                        <div class="requirement-item">
-                            <label>${task.name}:</label>
-                            <input type="number" min="0" value="${value}" 
-                                   data-task="${task.task_type}" 
-                                   style="${isCustom ? 'border-color: #007bff; background: #e3f2fd;' : ''}">
-                            <span>人</span>
-                            ${isCustom ? '<span style="color: #007bff; font-size: 12px;">個別設定</span>' : '<span style="color: #666; font-size: 12px;">デフォルト</span>'}
-                        </div>
-                    `;
-                }).join('');
-            } catch (error) {
-                console.error('日別人数読み込みエラー:', error);
             }
         }
 
@@ -765,38 +670,8 @@
             }
         }
 
-        // 日別人数保存
-        async function saveDailyRequirements() {
-            const date = document.getElementById('specificDate').value;
-            const requirements = {};
-            
-            document.querySelectorAll('#dailyRequirements input[data-task]').forEach(input => {
-                requirements[input.dataset.task] = parseInt(input.value) || 0;
-            });
-
-            try {
-                const response = await fetch(`${API_BASE}/requirements/daily/${date}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requirements)
-                });
-                
-                if (response.ok) {
-                    showMessage('dailyMessage', 'success', '日別人数を保存しました');
-                    loadDailyRequirements(); // 再読み込みして表示を更新
-                } else {
-                    throw new Error('保存に失敗しました');
-                }
-            } catch (error) {
-                showMessage('dailyMessage', 'error', `エラー: ${error.message}`);
-            }
-        }
-
         // 月変更時のイベント
         document.getElementById('defaultMonth').addEventListener('change', loadDefaultRequirements);
-        
-        // 日付変更時のイベント
-        document.getElementById('specificDate').addEventListener('change', loadDailyRequirements);
 
         // デフォルト作業種別追加
         async function addDefaultTasks(tasks) {

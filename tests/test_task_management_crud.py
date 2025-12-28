@@ -25,12 +25,14 @@ def test_create_task_generates_id_and_creates(monkeypatch):
     assert ('TASK', 'milking') in dummy.items
 
 
-def test_create_task_duplicate_returns_409(monkeypatch):
+def test_create_task_duplicate_auto_suffix(monkeypatch):
     dummy = DummyTable()
     dummy.items[('TASK', 'milking')] = {'PK': 'TASK', 'SK': 'milking'}
     monkeypatch.setattr(task_management_crud, 'table', dummy)
     event = {'body': json.dumps({'name': '搾乳'})}
     res = task_management_crud.create_task(event)
-    assert res['statusCode'] == 409
+    assert res['statusCode'] == 201
     body = json.loads(res['body'])
-    assert 'already exists' in body['error']
+    # should have created a new unique id different from 'milking'
+    assert body['task_type'] != 'milking'
+    assert ('TASK', body['task_type']) in dummy.items

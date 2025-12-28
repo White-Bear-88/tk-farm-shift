@@ -107,15 +107,19 @@ def create_task(event):
                 'headers': {'Content-Type': 'application/json'},
                 'body': json.dumps({'error': 'task_type could not be generated'})
             }
-        # Check duplicate
-        existing = table.get_item(Key={'PK': 'TASK', 'SK': task_type})
-        if existing.get('Item'):
-            return {
-                'statusCode': 409,
-                'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps({'error': 'task_type already exists'})
-            }
-        
+        # Ensure unique task_type: if collision, append numeric suffix until unique
+        base = task_type
+        candidate = base
+        suffix = 0
+        while True:
+            existing = table.get_item(Key={'PK': 'TASK', 'SK': candidate})
+            if not existing.get('Item'):
+                break
+            suffix += 1
+            candidate = f"{base}_{suffix}"
+
+        task_type = candidate
+
         item = {
             'PK': 'TASK',
             'SK': task_type,
