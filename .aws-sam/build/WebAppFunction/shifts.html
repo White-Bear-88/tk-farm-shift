@@ -268,15 +268,7 @@
             <a href="menu.html" class="back-btn">← メニューに戻る</a>
         </div>
 
-        <div class="section">
-            <h2>シフト自動生成</h2>
-            <div class="auto-generate-compact">
-                <label>対象月:</label>
-                <input type="month" id="generateMonth">
-                <button id="generateMonthBtn" class="btn-success" onclick="generateMonthlyShifts()">自動シフト生成</button>
-            </div>
-            <div id="generateMessage"></div>
-        </div>
+
 
         <div class="section">
             <h2>シフトカレンダー</h2>
@@ -291,6 +283,7 @@
             </div>
             <div class="shift-calendar" id="shiftCalendar"></div>
             <div id="calendarMessage"></div>
+            <div id="generateMessage"></div>
         </div>
     </div>
 
@@ -337,7 +330,7 @@
                 <input type="hidden" id="shiftStatus" value="active">
                 <button id="submitBtn" type="submit">新規・変更</button>
                 <button id="deleteBtn" type="button" class="btn-danger" style="margin-left:8px" onclick="deleteSelectedShifts()">削除</button>
-                <button id="cancelBtn" type="button" onclick="clearFormFields()">キャンセル</button>
+                <button id="cancelBtn" type="button" onclick="closeShiftModal()">閉じる</button>
             </form>
             <div id="modalMessage"></div>
         </div>
@@ -356,16 +349,16 @@
             loadEmployees();
             loadTasks();
             setDefaultDates();
-            // If month specified in URL, use it; otherwise default to current month
-            const monthParam = getQueryParam('month');
-            if (monthParam) {
-                document.getElementById('calendarMonth').value = monthParam;
-            } else {
-                setCurrentMonth();
-            }
+            // 初回表示は必ず今月をセット
+            setCurrentMonth();
             updateShiftCalendar();
-            // Ensure modal is hidden on initial load (prevent accidental auto-open)
+            // ボタン状態を更新（過去月なら自動生成を無効にする）
+            updateGenerateButtons();
+            // Ensure modal is explicitly hidden on initial load (prevent accidental auto-open)
+            const modal = document.getElementById('shiftModal');
+            if (modal) { modal.style.display = 'none'; }
             try { closeShiftModal(); } catch(e) { /* ignore in initialization */ }
+            try { clearFormFields(); } catch(e) { /* ignore */ }
         });
 
         // 現在の月を設定
@@ -481,21 +474,63 @@
             document.getElementById('modalMessage').innerHTML = '';
         }
 
-        // 月間シフト自動生成
+        // 月が過去かどうか判定
+        function isMonthInPast(monthValue) {
+            if (!monthValue) return false;
+            const [y, m] = monthValue.split('-').map(Number);
+            const now = new Date();
+            const nowY = now.getFullYear();
+            const nowM = now.getMonth() + 1;
+            return (y < nowY) || (y === nowY && m < nowM);
+        }
+
+        // 自動生成ボタンの有効/無効を更新
+        function updateGenerateButtons() {
+            const monthValue = document.getElementById('calendarMonth').value;
+            const disabled = isMonthInPast(monthValue);
+            const btn1 = document.getElementById('generateMonthBtn');
+            const btn2 = document.getElementById('generateMonthBtn2');
+            if (btn1) {
+                btn1.disabled = disabled;
+                btn1.title = disabled ? '過去月のため自動生成できません' : '';
+            }
+            if (btn2) {
+                btn2.disabled = disabled;
+                btn2.title = disabled ? '過去月のため自動生成できません' : '';
+            }
+            const calendarMessage = document.getElementById('calendarMessage');
+            if (calendarMessage) calendarMessage.textContent = disabled ? '過去月のため自動シフト生成は無効です' : '';
+        }
+
+        // 現在のグローバルデフォルト人数を取得（UI上の値）
+        function getCurrentDefaultRequirements() {
+            const reqs = {};
+            document.querySelectorAll('#globalDefaultRequirements input[data-task]').forEach(input => {
+                reqs[input.dataset.task] = parseInt(input.value) || 0;
+            });
+            return reqs;
+        }
+
+        // 月間シフト自動生成 (対象は常に表示月)。使用する必要人数は、UIに表示されているグローバルデフォルト値を利用する
         async function generateMonthlyShifts() {
-            const monthValue = document.getElementById('generateMonth').value || document.getElementById('calendarMonth').value;
+            const monthValue = document.getElementById('calendarMonth').value;
             if (!monthValue) {
                 showMessage('generateMessage', 'error', '月を選択してください');
                 return;
             }
-            
+            if (isMonthInPast(monthValue)) {
+                showMessage('generateMessage', 'error', '表示月が過去のため、自動シフト生成できません');
+                return;
+            }
+            const requirements = getCurrentDefaultRequirements();
+
             // Preview generation first (do not commit) — reflect on calendar instead of modal
             setProcessing(true, 'プレビューを取得中...');
             try {
                 const previewRes = await fetch(`${API_BASE}/shifts/generate-monthly`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ month: monthValue, overwrite: false, preview: true })
+                    body: JSON.stringify({ month: monthValue, overwrite: false, preview: true, requirements })
                 });
                 if (!previewRes.ok) throw new Error('シフト生成プレビューに失敗しました');
                 const previewData = await previewRes.json();
@@ -583,10 +618,11 @@
                     if (!ok) return;
                 }
 
+                const requirements = getCurrentDefaultRequirements();
                 const commitRes = await fetch(`${API_BASE}/shifts/generate-monthly`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ month: monthValue, overwrite: true, preview: false })
+                    body: JSON.stringify({ month: monthValue, overwrite: true, preview: false, requirements })
                 });
                 if (!commitRes.ok) {
                     const errText = await commitRes.text();
@@ -874,7 +910,7 @@
                         const empName = employeesMap[s.employee_id] || s.employee_id;
                         const disabledAttr = s._preview ? 'disabled title="プレビュー中のため操作不可"' : '';
                         const chkId = s.shift_id ? `chk_${s.shift_id}` : `chk_preview_${btoa(s.date + s.task_type).replace(/=/g,'')}`;
-                        return `<div style="padding:6px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:8px">` +
+                        return `<div style="padding:6px 6px 6px 0;border-bottom:1px solid #eee;display:flex;align-items:center;gap:8px;justify-content:flex-start">` +
                             `<input type="checkbox" class="shift-checkbox" id="${chkId}" data-shift-id="${s.shift_id||''}" ${disabledAttr} onchange="onShiftCheckboxChange(this, '${s.shift_id||''}')">` +
                             `<div style="flex:1">` +
                             `<strong>${getTaskName(s.task_type)}${s._preview? ' (プレビュー)':''}</strong><br>` +

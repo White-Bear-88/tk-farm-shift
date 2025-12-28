@@ -237,18 +237,7 @@
             <div id="globalDefaultMessage"></div>
         </div>
 
-        <div class="section">
-            <h2>月別作業人数（デフォルト値）</h2>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>対象月:</label>
-                    <input type="month" id="defaultMonth" required>
-                </div>
-            </div>
-            <div id="defaultRequirements"></div>
-            <button onclick="saveDefaultRequirements()">デフォルト人数保存</button>
-            <div id="defaultMessage"></div>
-        </div>
+
 
         <div class="section">
             <h2>日別作業人数設定</h2>
@@ -438,7 +427,6 @@
         // ページ読み込み時に作業種別一覧を表示
         document.addEventListener('DOMContentLoaded', () => {
             loadTasks();
-            setDefaultMonth();
             setDefaultDate();
             loadConfirmationSettings();
             loadGlobalDefaultRequirements();

@@ -68,8 +68,8 @@ def generate_monthly_shifts(event):
     if not preview and overwrite:
         delete_existing_shifts_for_month(month)
     
-    # 月別/グローバルデフォルト人数設定を取得
-    requirements = get_requirements_for_month(month)
+    # リクエストに要求人数が含まれていればそれを優先して使用（フロントの設定が未保存の場合にも対応）
+    requirements = data.get('requirements') or get_requirements_for_month(month)
     
     # 従業員リストを取得
     employees = get_available_employees()
