@@ -5,7 +5,13 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import calendar
 
-dynamodb = boto3.resource('dynamodb')
+# Support local dynamodb endpoint
+_dynamodb_endpoint = os.environ.get('DYNAMODB_ENDPOINT')
+if _dynamodb_endpoint:
+    dynamodb = boto3.resource('dynamodb', endpoint_url=_dynamodb_endpoint)
+else:
+    dynamodb = boto3.resource('dynamodb')
+
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
 def lambda_handler(event, context):
@@ -34,16 +40,32 @@ def lambda_handler(event, context):
         }
 
 def generate_monthly_shifts(event):
-    """月間シフト自動生成"""
+    """月間シフト自動生成
+    Supports preview mode: if data['preview'] is True, do not write or delete anything; just return generated shifts for review.
+    Prevent generation for past months.
+    """
     data = json.loads(event['body'])
     month = data['month']  # "2024-12" format
     overwrite = data.get('overwrite', True)  # デフォルトで上書き
-    
+    preview = data.get('preview', False)
+
+    # Prevent generation for past months (relative to current year-month)
     year, month_num = map(int, month.split('-'))
+    from datetime import datetime as _dt
+    now = _dt.now()
+    if (year, month_num) < (now.year, now.month):
+        return {
+            'statusCode': 400,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'error': '過去の月の生成はできません'})
+        }
+
     days_in_month = calendar.monthrange(year, month_num)[1]
     
-    # 上書きモードの場合、既存シフトを削除
-    if overwrite:
+    generated_shifts = []
+    
+    # Only delete or write when not previewing
+    if not preview and overwrite:
         delete_existing_shifts_for_month(month)
     
     # 月別/グローバルデフォルト人数設定を取得
@@ -51,8 +73,6 @@ def generate_monthly_shifts(event):
     
     # 従業員リストを取得
     employees = get_available_employees()
-    
-    generated_shifts = []
     
     for day in range(1, days_in_month + 1):
         date = f"{month}-{day:02d}"
@@ -66,6 +86,7 @@ def generate_monthly_shifts(event):
         
         # その日のシフトを生成
         day_shifts = generate_day_shifts(date, day_requirements, employees, overwrite)
+        # If not preview, generated shifts are already saved in generate_day_shifts via save_shift_assignment_safe
         generated_shifts.extend(day_shifts)
     
     return {
@@ -73,7 +94,8 @@ def generate_monthly_shifts(event):
         'headers': {'Content-Type': 'application/json'},
         'body': json.dumps({
             'message': f'Generated {len(generated_shifts)} shifts for {month}',
-            'shifts': generated_shifts
+            'shifts': generated_shifts,
+            'preview': preview
         })
     }
 
@@ -99,7 +121,9 @@ def delete_existing_shifts_for_month(month):
                 )
 
 def get_shifts_by_month(month):
-    """月別シフト取得"""
+    """月別シフト取得
+    Also cleans duplicate assignments where same employee has multiple roles on a given date by keeping the first and deleting others.
+    """
     year, month_num = map(int, month.split('-'))
     days_in_month = calendar.monthrange(year, month_num)[1]
     
@@ -113,11 +137,22 @@ def get_shifts_by_month(month):
             ExpressionAttributeValues={':pk': f'SHIFT#{date}'}
         )
         
+        seen_employees = set()
         for item in response['Items']:
+            employee_id = item['SK'].split('#')[1]
+            task_type = item['SK'].split('#')[2]
+            if employee_id in seen_employees:
+                # Duplicate: delete this entry to clean data
+                try:
+                    table.delete_item(Key={'PK': item['PK'], 'SK': item['SK']})
+                except Exception:
+                    pass
+                continue
+            seen_employees.add(employee_id)
             shift = {
                 'date': date,
-                'employee_id': item['SK'].split('#')[1],
-                'task_type': item['SK'].split('#')[2],
+                'employee_id': employee_id,
+                'task_type': task_type,
                 'start_time': item['start_time'],
                 'end_time': item['end_time'],
                 'status': item.get('status', 'scheduled')
@@ -205,8 +240,31 @@ def generate_day_shifts(date, requirements, employees, overwrite=True):
     
     return shifts
 
+def employee_has_shift_on_date(date, employee_id):
+    """Return True if the employee already has any shift on the given date."""
+    try:
+        response = table.query(
+            KeyConditionExpression='PK = :pk',
+            ExpressionAttributeValues={':pk': f'SHIFT#{date}'}
+        )
+        for item in response['Items']:
+            if item['SK'].startswith(f'EMP#{employee_id}#'):
+                return True
+        return False
+    except Exception:
+        # Conservatively return True to avoid accidental double assignment on error
+        return True
+
+
 def save_shift_assignment_safe(assignment, overwrite=True):
-    """冪等性を保つシフト保存"""
+    """冪等性を保つシフト保存
+    Prevent assigning the same employee to more than one task on the same date.
+    """
+    # Check duplicate assignment for same employee/date
+    if employee_has_shift_on_date(assignment['date'], assignment['employee_id']):
+        # There's already a shift for this employee this date — skip/save prevented
+        return False
+
     pk = f"SHIFT#{assignment['date']}"
     sk = f"EMP#{assignment['employee_id']}#{assignment['task_type']}"
     

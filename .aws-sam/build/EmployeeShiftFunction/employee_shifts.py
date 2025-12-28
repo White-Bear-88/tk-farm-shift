@@ -2,8 +2,15 @@ import json
 import boto3
 import os
 from datetime import datetime, timedelta
+import calendar
 
-dynamodb = boto3.resource('dynamodb')
+# Support local dynamodb endpoint
+_dynamodb_endpoint = os.environ.get('DYNAMODB_ENDPOINT')
+if _dynamodb_endpoint:
+    dynamodb = boto3.resource('dynamodb', endpoint_url=_dynamodb_endpoint)
+else:
+    dynamodb = boto3.resource('dynamodb')
+
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
 def lambda_handler(event, context):
@@ -11,11 +18,21 @@ def lambda_handler(event, context):
         employee_id = event['pathParameters']['id']
         query_params = event.get('queryStringParameters', {}) or {}
         
-        # デフォルトで過去30日間のシフトを取得
-        start_date = query_params.get('start_date', 
-            (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
-        end_date = query_params.get('end_date', 
-            datetime.now().strftime('%Y-%m-%d'))
+        # month, date, or explicit start/end date をサポート
+        if query_params.get('month'):
+            # month = "YYYY-MM"
+            month_str = query_params['month']
+            year, month_num = map(int, month_str.split('-'))
+            last_day = calendar.monthrange(year, month_num)[1]
+            start_date = f"{month_str}-01"
+            end_date = f"{month_str}-{last_day:02d}"
+        elif query_params.get('date'):
+            start_date = end_date = query_params['date']
+        else:
+            start_date = query_params.get('start_date', 
+                (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+            end_date = query_params.get('end_date', 
+                datetime.now().strftime('%Y-%m-%d'))
         
         response = table.query(
             IndexName='GSI1',
@@ -38,17 +55,11 @@ def lambda_handler(event, context):
                 'duration_hours': calculate_duration(item['start_time'], item['end_time'])
             })
         
-        # 統計情報を計算
-        stats = calculate_employee_stats(shifts)
-        
+        # フロントエンド互換性のため、シンプルにシフトの配列を返す
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({
-                'employee_id': employee_id,
-                'shifts': shifts,
-                'statistics': stats
-            }, default=str)
+            'body': json.dumps(shifts, default=str)
         }
         
     except Exception as e:

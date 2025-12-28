@@ -2,7 +2,13 @@ import json
 import boto3
 import os
 
-dynamodb = boto3.resource('dynamodb')
+# Support local dynamodb endpoint
+_dynamodb_endpoint = os.environ.get('DYNAMODB_ENDPOINT')
+if _dynamodb_endpoint:
+    dynamodb = boto3.resource('dynamodb', endpoint_url=_dynamodb_endpoint)
+else:
+    dynamodb = boto3.resource('dynamodb')
+
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
 def lambda_handler(event, context):
