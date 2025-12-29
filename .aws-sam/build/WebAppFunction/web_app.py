@@ -6,16 +6,27 @@ def lambda_handler(event, context):
     # リクエストパスを取得
     path = event.get('path', '/')
     
-    # faviconリクエストの場合は空のレスポンスを返す
+    # faviconリクエストの場合は実際のファイルを返す
     if path == '/favicon.ico':
-        return {
-            'statusCode': 204,
-            'headers': {
-                'Content-Type': 'image/x-icon',
-                'Cache-Control': 'public, max-age=86400'
-            },
-            'body': ''
-        }
+        favicon_path = os.path.join(os.path.dirname(__file__), 'favicon.ico')
+        try:
+            with open(favicon_path, 'rb') as f:
+                favicon_data = f.read()
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'image/x-icon',
+                    'Cache-Control': 'public, max-age=86400'
+                },
+                'body': base64.b64encode(favicon_data).decode('utf-8'),
+                'isBase64Encoded': True
+            }
+        except FileNotFoundError:
+            return {
+                'statusCode': 204,
+                'headers': {'Content-Type': 'image/x-icon'},
+                'body': ''
+            }
     
     # パスに基づいてファイル名を決定
     if path == '/' or path == '/index.html':

@@ -266,6 +266,19 @@
         let currentDate = new Date();
         let selectedEmployeeId = '';
 
+        // ボタンの処理中状態を管理
+        function setButtonLoading(button, loading) {
+            if (loading) {
+                button.disabled = true;
+                button.style.opacity = '0.6';
+                button.style.cursor = 'not-allowed';
+            } else {
+                button.disabled = false;
+                button.style.opacity = '1';
+                button.style.cursor = 'pointer';
+            }
+        }
+
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', () => {
             loadEmployees();
@@ -313,9 +326,16 @@
                 document.getElementById('totalVacation').textContent = employee.vacation_days || 20;
                 
                 // 使用済み有給日数を計算
-                const usedResponse = await fetch(`${API_BASE}/employees/${selectedEmployeeId}/vacation-used`);
-                const usedData = await usedResponse.json();
-                const used = usedData.used_days || 0;
+                let used = 0;
+                try {
+                    const usedResponse = await fetch(`${API_BASE}/employees/${selectedEmployeeId}/vacation-used`);
+                    if (usedResponse.ok) {
+                        const usedData = await usedResponse.json();
+                        used = usedData.used_days || 0;
+                    }
+                } catch (error) {
+                    console.log('有給使用日数取得エラー、デフォルト値0を使用');
+                }
                 
                 document.getElementById('usedVacation').textContent = used;
                 document.getElementById('remainingVacation').textContent = (employee.vacation_days || 20) - used;
@@ -436,8 +456,13 @@
         document.getElementById('vacationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            setButtonLoading(submitBtn, true);
+            showMessage('処理中...', 'error');
+            
             if (!selectedEmployeeId) {
-                showMessage('従業員を選択してください');
+                showMessage('従業員を選択してください', 'error');
+                setButtonLoading(submitBtn, false);
                 return;
             }
             
@@ -451,6 +476,7 @@
             
             if (remaining < requestDays) {
                 showMessage('有給休暇の残日数が不足しています', 'error');
+                setButtonLoading(submitBtn, false);
                 return;
             }
             
@@ -467,11 +493,12 @@
                     const nextMonth = new Date(requestDate.getFullYear(), requestDate.getMonth(), confirmationDay);
                     if (requestDate.getMonth() > now.getMonth() && now > nextMonth) {
                         showMessage('シフト確定日を過ぎているため申請できません', 'error');
+                        setButtonLoading(submitBtn, false);
                         return;
                     }
                 }
             } catch (error) {
-                console.log('確定日チェックエラー');
+                console.log('確定日チェックエラー、スキップ');
             }
             
             const data = {
@@ -489,7 +516,7 @@
                 });
                 
                 if (response.ok) {
-                    showMessage('休暇申請を送信しました', 'success');
+                    showMessage('✓ 休暇申請を送信しました。', 'success');
                     document.getElementById('vacationForm').reset();
                     updateCalendar();
                     loadEmployeeInfo(); // 有給残日数更新
@@ -498,6 +525,8 @@
                 }
             } catch (error) {
                 showMessage(`エラー: ${error.message}`, 'error');
+            } finally {
+                setButtonLoading(submitBtn, false);
             }
         });
 

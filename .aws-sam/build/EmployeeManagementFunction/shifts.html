@@ -279,6 +279,7 @@
                 <div class="month-selector">
                     <label>表示月:</label>
                     <input type="month" id="calendarMonth" onchange="updateShiftCalendar()">
+                    <span id="calendarLoadingMessage" style="margin-left: 15px; color: #666; font-size: 14px;"></span>
                 </div>
                 <div class="auto-generate">
                     <button id="generateMonthBtn2" class="btn-success" onclick="generateMonthlyShifts()">シフト自動生成</button>
@@ -347,6 +348,19 @@
         let previewMonth = null;
         let previewShifts = [];
 
+        // ボタンの処理中状態を管理
+        function setButtonLoading(button, loading) {
+            if (loading) {
+                button.disabled = true;
+                button.style.opacity = '0.6';
+                button.style.cursor = 'not-allowed';
+            } else {
+                button.disabled = false;
+                button.style.opacity = '1';
+                button.style.cursor = 'pointer';
+            }
+        }
+
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', async () => {
             // suppressModalOnLoad を初期化して、ナビ遷移時の不意なモーダル表示を防ぐ
@@ -388,17 +402,20 @@
             const monthValue = document.getElementById('calendarMonth').value;
             if (!monthValue) return;
             
+            // ローディング表示（表示月の横に）
+            const loadingMessage = document.getElementById('calendarLoadingMessage');
+            if (loadingMessage) loadingMessage.innerHTML = '<span class="spinner"></span>読み込み中...';
+            
+            const calendar = document.getElementById('shiftCalendar');
             const [year, month] = monthValue.split('-').map(Number);
             const firstDay = new Date(year, month - 1, 1);
             const lastDay = new Date(year, month, 0);
             const startDate = new Date(firstDay);
             startDate.setDate(startDate.getDate() - firstDay.getDay());
             
-            const calendar = document.getElementById('shiftCalendar');
-            calendar.innerHTML = '';
-            
             // ヘッダー
             const headers = ['日', '月', '火', '水', '木', '金', '土'];
+            calendar.innerHTML = '';
             headers.forEach(header => {
                 const headerDiv = document.createElement('div');
                 headerDiv.className = 'calendar-header';
@@ -465,20 +482,28 @@
                 dayDiv.onclick = () => openShiftModal(dateStr);
                 calendar.appendChild(dayDiv);
             }
+            
+            // ローディングメッセージをクリア
+            if (loadingMessage) loadingMessage.innerHTML = '';
         }
 
         // シフトモーダルを開く（指定日のシフト一覧を読み込み）
         // force=true を渡すと suppress フラグに関係なく強制表示する
         async function openShiftModal(date, force=false) {
+            // モーダルを先に表示して読み込み中メッセージを表示
+            if (!window.suppressModalOnLoad || force) {
+                const modal = document.getElementById('shiftModal');
+                modal.classList.add('is-open');
+                modal.style.display = 'flex';
+                
+                // 読み込み中メッセージを表示
+                document.getElementById('dayShiftsList').innerHTML = '<div style="text-align:center;padding:20px;"><span class="spinner"></span>読み込み中...</div>';
+            }
+            
             document.getElementById('shiftDate').value = date;
             document.getElementById('shiftDateDisplay').textContent = date;
             // Load shifts for date (server side) and include preview items
             await loadShiftsForDate(date);
-            // 初期化時に自動で開かないように抑制する
-            if (window.suppressModalOnLoad && !force) return;
-            const modal = document.getElementById('shiftModal');
-            modal.classList.add('is-open');
-            modal.style.display = 'flex';
         }
 
         // シフトモーダルを閉じる
@@ -525,13 +550,19 @@
 
         // 月間シフト自動生成 (対象は常に表示月)。使用する必要人数は、UIに表示されているグローバルデフォルト値を利用する
         async function generateMonthlyShifts() {
+            const button = event.target;
+            setButtonLoading(button, true);
+            showMessage('generateMessage', 'error', '処理中...');
+            
             const monthValue = document.getElementById('calendarMonth').value;
             if (!monthValue) {
                 showMessage('generateMessage', 'error', '月を選択してください');
+                setButtonLoading(button, false);
                 return;
             }
             if (isMonthInPast(monthValue)) {
                 showMessage('generateMessage', 'error', '表示月が過去のため、自動シフト生成できません');
+                setButtonLoading(button, false);
                 return;
             }
             const requirements = getCurrentDefaultRequirements();
@@ -552,6 +583,7 @@
                 showMessage('generateMessage', 'error', `エラー: ${error.message}`);
             } finally {
                 setProcessing(false);
+                setButtonLoading(button, false);
             }
         }
 
@@ -618,6 +650,10 @@
 
         async function commitPreview() {
             if (!previewMonth) return;
+            const button = event.target;
+            setButtonLoading(button, true);
+            showMessage('generateMessage', 'error', '処理中...');
+            
             const monthValue = previewMonth;
             setProcessing(true, '登録中...');
             try {
@@ -637,7 +673,7 @@
                     const errText = await commitRes.text();
                     throw new Error(errText || 'シフト登録に失敗しました');
                 }
-                showMessage('generateMessage', 'success', `${monthValue}のシフトを登録しました`);
+                showMessage('generateMessage', 'success', `✓ ${monthValue}のシフトを登録しました。`);
                 // clear preview and refresh from server
                 previewMonth = null;
                 previewShifts = [];
@@ -646,6 +682,7 @@
                 showMessage('generateMessage', 'error', `エラー: ${error.message}`);
             } finally {
                 setProcessing(false);
+                setButtonLoading(button, false);
             }
         }
 
@@ -824,45 +861,48 @@
         });
 
         // 自動シフト割り当て
-        document.getElementById('autoAssignForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const requiredTasks = [];
-            document.querySelectorAll('#taskRequirements input[type="number"]').forEach(input => {
-                const count = parseInt(input.value);
-                if (count > 0) {
-                    requiredTasks.push({
-                        task_type: input.dataset.task,
-                        count: count
+        const autoAssignForm = document.getElementById('autoAssignForm');
+        if (autoAssignForm) {
+            autoAssignForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const requiredTasks = [];
+                document.querySelectorAll('#taskRequirements input[type="number"]').forEach(input => {
+                    const count = parseInt(input.value);
+                    if (count > 0) {
+                        requiredTasks.push({
+                            task_type: input.dataset.task,
+                            count: count
+                        });
+                    }
+                });
+
+                const data = {
+                    date: document.getElementById('assignDate').value,
+                    required_tasks: requiredTasks
+                };
+
+                try {
+                    const response = await fetch(`${API_BASE}/shifts/assign`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
                     });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        showMessage('assignMessage', 'success', '自動シフト割り当てが完了しました');
+                        searchShifts();
+                    } else {
+                        let errText = await response.text();
+                        try { const j = JSON.parse(errText); errText = j.error || j.message || errText; } catch(e){}
+                        throw new Error(errText || '自動割り当てに失敗しました');
+                    }
+                } catch (error) {
+                    showMessage('assignMessage', 'error', `エラー: ${error.message}`);
                 }
             });
-
-            const data = {
-                date: document.getElementById('assignDate').value,
-                required_tasks: requiredTasks
-            };
-
-            try {
-                const response = await fetch(`${API_BASE}/shifts/assign`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    showMessage('assignMessage', 'success', '自動シフト割り当てが完了しました');
-                    searchShifts();
-                } else {
-                    let errText = await response.text();
-                    try { const j = JSON.parse(errText); errText = j.error || j.message || errText; } catch(e){}
-                    throw new Error(errText || '自動割り当てに失敗しました');
-                }
-            } catch (error) {
-                showMessage('assignMessage', 'error', `エラー: ${error.message}`);
-            }
-        });
+        }
 
         // シフト検索
         async function searchShifts() {
@@ -922,8 +962,8 @@
                         const empName = employeesMap[s.employee_id] || s.employee_id;
                         const disabledAttr = s._preview ? 'disabled title="プレビュー中のため操作不可"' : '';
                         const chkId = s.shift_id ? `chk_${s.shift_id}` : `chk_preview_${btoa(s.date + s.task_type).replace(/=/g,'')}`;
-                        return `<div style="padding:6px 6px 6px 0;border-bottom:1px solid #eee;display:flex;align-items:center;gap:8px;justify-content:flex-start">` +
-                            `<input type="checkbox" class="shift-checkbox" id="${chkId}" data-shift-id="${s.shift_id||''}" ${disabledAttr} onchange="onShiftCheckboxChange(this, '${s.shift_id||''}')">` +
+                        return `<div style="padding:6px 6px 6px 0;border-bottom:1px solid #eee;display:flex;align-items:flex-start;gap:8px;">` +
+                            `<input type="checkbox" class="shift-checkbox" id="${chkId}" data-shift-id="${s.shift_id||''}" ${disabledAttr} onchange="onShiftCheckboxChange(this, '${s.shift_id||''}')" style="margin-top: 2px; align-self: flex-start;">` +
                             `<div style="flex:1">` +
                             `<strong>${getTaskName(s.task_type)}${s._preview? ' (プレビュー)':''}</strong><br>` +
                             `${empName} ${s.start_time || ''} - ${s.end_time || ''}` +
@@ -1054,6 +1094,9 @@
 
             if (!confirm('登録データを削除しますか？')) return;
 
+            const button = event.target;
+            setButtonLoading(button, true);
+            showMessage('modalMessage', 'error', '処理中...');
             setProcessing(true, '削除中...');
             try {
                 const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
@@ -1063,7 +1106,7 @@
                     const res = await fetch(`${API_BASE}/shifts/${sid}`, { method: 'DELETE' });
                     if (!res.ok) throw new Error('削除に失敗しました');
                 }
-                showMessage('modalMessage', 'success', '削除しました。');
+                showMessage('modalMessage', 'success', '✓ 削除しました。');
                 // Refresh list and calendar
                 await loadShiftsForDate(date);
                 updateShiftCalendar();
@@ -1071,6 +1114,7 @@
                 showMessage('modalMessage', 'error', `エラー: ${error.message}`);
             } finally {
                 setProcessing(false);
+                setButtonLoading(button, false);
             }
         }
 
@@ -1162,37 +1206,40 @@
             setTimeout(() => messageDiv.innerHTML = '', 5000);
         }
         // 従業員選択時に対応可能な作業種別のみ表示
-        document.getElementById('employeeSelect').addEventListener('change', async function() {
-            const employeeId = this.value;
-            if (!employeeId) {
-                loadTasks();
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/employees/${employeeId}`);
-                const employee = await response.json();
-                
-                const taskSelect = document.getElementById('taskSelect');
-                taskSelect.innerHTML = '<option value="">作業を選択</option>';
-                
-                if (employee.skills && employee.skills.length > 0) {
-                    const allTasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
-                    
-                    allTasks.forEach(task => {
-                        if (employee.skills.includes(task.task_type)) {
-                            const option = document.createElement('option');
-                            option.value = task.task_type;
-                            option.textContent = `${task.name} (${task.task_type})`;
-                            taskSelect.appendChild(option);
-                        }
-                    });
+        const employeeSelectEl = document.getElementById('employeeSelect');
+        if (employeeSelectEl) {
+            employeeSelectEl.addEventListener('change', async function() {
+                const employeeId = this.value;
+                if (!employeeId) {
+                    loadTasks();
+                    return;
                 }
-            } catch (error) {
-                console.error('従業員情報取得エラー:', error);
-                loadTasks(); // フォールバック
-            }
-        });
+                
+                try {
+                    const response = await fetch(`${API_BASE}/employees/${employeeId}`);
+                    const employee = await response.json();
+                    
+                    const taskSelect = document.getElementById('taskSelect');
+                    taskSelect.innerHTML = '<option value="">作業を選択</option>';
+                    
+                    if (employee.skills && employee.skills.length > 0) {
+                        const allTasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
+                        
+                        allTasks.forEach(task => {
+                            if (employee.skills.includes(task.task_type)) {
+                                const option = document.createElement('option');
+                                option.value = task.task_type;
+                                option.textContent = `${task.name} (${task.task_type})`;
+                                taskSelect.appendChild(option);
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('従業員情報取得エラー:', error);
+                    loadTasks(); // フォールバック
+                }
+            });
+        }
         // 作業名変換
         function getTaskName(taskType) {
             const names = {

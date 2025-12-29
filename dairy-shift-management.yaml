@@ -74,6 +74,9 @@ Resources:
     Type: AWS::Serverless::Api
     Properties:
       StageName: !Ref Environment
+      BinaryMediaTypes:
+        - image/x-icon
+        - image/*
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
@@ -98,6 +101,12 @@ Resources:
           Properties:
             RestApiId: !Ref ShiftManagementApi
             Path: /{filename}
+            Method: GET
+        Favicon:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /favicon.ico
             Method: GET
 
   ShiftCrudFunction:
@@ -175,6 +184,12 @@ Resources:
             RestApiId: !Ref ShiftManagementApi
             Path: /employees/{id}
             Method: DELETE
+        GetEmployeeVacationUsed:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /employees/{id}/vacation-used
+            Method: GET
 
   EmployeeShiftFunction:
     Type: AWS::Serverless::Function

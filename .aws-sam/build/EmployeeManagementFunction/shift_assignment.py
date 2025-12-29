@@ -44,60 +44,66 @@ def generate_monthly_shifts(event):
     Supports preview mode: if data['preview'] is True, do not write or delete anything; just return generated shifts for review.
     Prevent generation for past months.
     """
-    data = json.loads(event['body'])
-    month = data['month']  # "2024-12" format
-    overwrite = data.get('overwrite', True)  # デフォルトで上書き
-    preview = data.get('preview', False)
+    try:
+        data = json.loads(event['body'])
+        month = data['month']  # "2024-12" format
+        overwrite = data.get('overwrite', True)  # デフォルトで上書き
+        preview = data.get('preview', False)
 
-    # Prevent generation for past months (relative to current year-month)
-    year, month_num = map(int, month.split('-'))
-    from datetime import datetime as _dt
-    now = _dt.now()
-    if (year, month_num) < (now.year, now.month):
+        # Prevent generation for past months (relative to current year-month)
+        year, month_num = map(int, month.split('-'))
+        from datetime import datetime as _dt
+        now = _dt.now()
+        if (year, month_num) < (now.year, now.month):
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': '過去の月の生成はできません'})
+            }
+
+        days_in_month = calendar.monthrange(year, month_num)[1]
+        
+        generated_shifts = []
+        
+        # Only delete or write when not previewing
+        if not preview and overwrite:
+            delete_existing_shifts_for_month(month)
+        
+        # リクエストに要求人数が含まれていればそれを優先して使用（フロントの設定が未保存の場合にも対応）
+        requirements = data.get('requirements') or get_requirements_for_month(month)
+        
+        # 従業員リストを取得
+        employees = get_available_employees()
+        
+        for day in range(1, days_in_month + 1):
+            date = f"{month}-{day:02d}"
+            
+            # 日別設定があるかチェック
+            daily_reqs = get_daily_requirements(date)
+            if daily_reqs:
+                day_requirements = daily_reqs
+            else:
+                day_requirements = requirements
+            
+            # その日のシフトを生成
+            day_shifts = generate_day_shifts(date, day_requirements, employees, not preview)
+            generated_shifts.extend(day_shifts)
+        
         return {
-            'statusCode': 400,
+            'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'error': '過去の月の生成はできません'})
+            'body': json.dumps({
+                'message': f'Generated {len(generated_shifts)} shifts for {month}',
+                'shifts': generated_shifts,
+                'preview': preview
+            })
         }
-
-    days_in_month = calendar.monthrange(year, month_num)[1]
-    
-    generated_shifts = []
-    
-    # Only delete or write when not previewing
-    if not preview and overwrite:
-        delete_existing_shifts_for_month(month)
-    
-    # リクエストに要求人数が含まれていればそれを優先して使用（フロントの設定が未保存の場合にも対応）
-    requirements = data.get('requirements') or get_requirements_for_month(month)
-    
-    # 従業員リストを取得
-    employees = get_available_employees()
-    
-    for day in range(1, days_in_month + 1):
-        date = f"{month}-{day:02d}"
-        
-        # 日別設定があるかチェック
-        daily_reqs = get_daily_requirements(date)
-        if daily_reqs:
-            day_requirements = daily_reqs
-        else:
-            day_requirements = requirements
-        
-        # その日のシフトを生成
-        day_shifts = generate_day_shifts(date, day_requirements, employees, overwrite)
-        # If not preview, generated shifts are already saved in generate_day_shifts via save_shift_assignment_safe
-        generated_shifts.extend(day_shifts)
-    
-    return {
-        'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
-        'body': json.dumps({
-            'message': f'Generated {len(generated_shifts)} shifts for {month}',
-            'shifts': generated_shifts,
-            'preview': preview
-        })
-    }
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'error': f'シフト生成エラー: {str(e)}'})
+        }
 
 def delete_existing_shifts_for_month(month):
     """月の既存シフトを削除"""

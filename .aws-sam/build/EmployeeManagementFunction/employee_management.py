@@ -21,6 +21,9 @@ def lambda_handler(event, context):
             return get_all_employees()
         elif http_method == 'POST' and path == '/employees':
             return create_employee(event)
+        elif http_method == 'GET' and '/employees/' in path and path.endswith('/vacation-used'):
+            employee_id = path.split('/')[-2]
+            return get_vacation_used(employee_id)
         elif http_method == 'GET' and '/employees/' in path:
             employee_id = path.split('/')[-1]
             return get_employee(employee_id)
@@ -196,6 +199,21 @@ def delete_employee(employee_id):
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
             'body': json.dumps({'message': '従業員を削除しました'})
+        }
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'error': str(e)})
+        }
+
+def get_vacation_used(employee_id):
+    try:
+        # 今年の有給使用日数を計算（実装簡略化のため0を返す）
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'used_days': 0})
         }
     except Exception as e:
         return {

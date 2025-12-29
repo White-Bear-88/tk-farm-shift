@@ -27,17 +27,22 @@
             align-items: center;
         }
         .back-btn {
-            background: #6c757d;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: 12px 24px;
+            border-radius: 8px;
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
         .back-btn:hover {
-            background: #5a6268;
+            background: linear-gradient(135deg, #5568d3 0%, #63408a 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.15);
         }
         .section {
             background: white;
@@ -264,6 +269,19 @@
     <script>
         const API_BASE = 'https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev';
 
+        // ボタンの処理中状態を管理
+        function setButtonLoading(button, loading) {
+            if (loading) {
+                button.disabled = true;
+                button.style.opacity = '0.6';
+                button.style.cursor = 'not-allowed';
+            } else {
+                button.disabled = false;
+                button.style.opacity = '1';
+                button.style.cursor = 'pointer';
+            }
+        }
+
         // Generate a unique task id from name (romanized + timestamp if needed)
         function generateTaskIdFromName(name) {
             name = (name || '').trim();
@@ -294,6 +312,10 @@
 
                 if (!taskName) { showMessage('error', '作業名を入力してください'); return; }
 
+                const submitBtn = document.getElementById('submitBtn');
+                setButtonLoading(submitBtn, true);
+                showMessage('error', '処理中...');
+
                 // Auto-generate ID from name (server will ensure uniqueness)
                 let genTaskType = generateTaskIdFromName(taskName);
                 if (!genTaskType) genTaskType = 'task_' + Date.now();
@@ -318,7 +340,7 @@
                     
                     if (response.ok) {
                         const result = await response.json();
-                        showMessage('success', isEdit ? '作業種別を更新しました' : '作業種別を登録しました');
+                        showMessage('success', isEdit ? '✓ 作業種別を更新しました。' : '✓ 作業種別を登録しました。');
                         closeTaskModal();
                         resetForm();
                         loadTasks();
@@ -328,6 +350,8 @@
                     }
                 } catch (error) {
                     showMessage('error', `エラー: ${error.message}`);
+                } finally {
+                    setButtonLoading(submitBtn, false);
                 }
             });
 
@@ -357,7 +381,7 @@
                     <div class="task-card">
                         <h4>
                             <span class="task-icon">${getTaskIcon(task.task_type)}</span>
-                            ${task.name} (${task.task_type})
+                            ${task.name}
                         </h4>
                         <div class="task-info">
                             <strong>説明:</strong> ${task.description || '未設定'}
@@ -392,16 +416,23 @@
         // Delete task
         async function deleteTask(taskType) {
             if (!confirm('この作業種別を削除しますか？')) return;
+            
+            const button = event.target;
+            setButtonLoading(button, true);
+            showMessage('error', '処理中...');
+            
             try {
                 const response = await fetch(`${API_BASE}/tasks/${taskType}`, { method: 'DELETE' });
                 if (response.ok) {
-                    showMessage('success', '作業種別を削除しました');
+                    showMessage('success', '✓ 作業種別を削除しました。');
                     loadTasks();
                 } else {
                     throw new Error('削除に失敗しました');
                 }
             } catch (error) {
                 showMessage('error', `エラー: ${error.message}`);
+            } finally {
+                setButtonLoading(button, false);
             }
         }
 
@@ -484,7 +515,7 @@
                         defaults = await response.json();
                     }
                 } catch (error) {
-                    console.log('グローバルデフォルト設定なし');
+                    console.log('グローバルデフォルト設定なし、デフォルト值使用');
                 }
 
                 const container = document.getElementById('globalDefaultRequirements');
@@ -492,17 +523,57 @@
                     <div class="requirement-item">
                         <label>${task.name}:</label>
                         <input type="number" min="0" value="${defaults[task.task_type] || task.required_people || 1}" 
-                               data-task="${task.task_type}">
+                               data-task="${task.task_type}"
+                               onchange="validateTotalRequirements()">
                         <span>人</span>
                     </div>
                 `).join('');
+                
+                // 初期表示時にもチェック
+                validateTotalRequirements();
             } catch (error) {
                 console.error('グローバルデフォルト人数読み込みエラー:', error);
+                const container = document.getElementById('globalDefaultRequirements');
+                container.innerHTML = '<p>データの読み込みに失敗しました</p>';
+            }
+        }
+
+        // 合計人数のリアルタイムバリデーション
+        async function validateTotalRequirements() {
+            let totalRequired = 0;
+            document.querySelectorAll('#globalDefaultRequirements input[data-task]').forEach(input => {
+                const count = parseInt(input.value) || 0;
+                totalRequired += count;
+            });
+
+            try {
+                const employeesResponse = await fetch(`${API_BASE}/employees`);
+                const employees = await employeesResponse.json();
+                const totalEmployees = employees.length;
+                
+                const messageDiv = document.getElementById('globalDefaultMessage');
+                if (totalRequired > totalEmployees) {
+                    messageDiv.innerHTML = `<div class="message error">⚠️ 総従業員数を超過しています。</div>`;
+                    return false;
+                } else if (totalRequired === totalEmployees) {
+                    messageDiv.innerHTML = `<div class="message success">✓ 必要人数の合計: ${totalRequired}人 / 従業員総数: ${totalEmployees}人（ちょうど）</div>`;
+                    return true;
+                } else {
+                    messageDiv.innerHTML = `<div class="message" style="background: #e7f3ff; color: #004085; border: 1px solid #b8daff;">必要人数の合計: ${totalRequired}人 / 従業員総数: ${totalEmployees}人</div>`;
+                    return true;
+                }
+            } catch (error) {
+                console.error('従業員数取得エラー:', error);
+                return true; // エラー時は保存を許可
             }
         }
 
         // グローバルデフォルト人数保存
         async function saveGlobalDefaultRequirements() {
+            const button = event.target;
+            setButtonLoading(button, true);
+            showMessage('globalDefaultMessage', 'error', '処理中...');
+            
             const requirements = {};
             let totalRequired = 0;
             
@@ -513,17 +584,22 @@
             });
 
             // 従業員総数を取得してチェック
+            let totalEmployees = 0;
             try {
                 const employeesResponse = await fetch(`${API_BASE}/employees`);
                 const employees = await employeesResponse.json();
-                const totalEmployees = employees.length;
+                totalEmployees = employees.length;
                 
                 if (totalRequired > totalEmployees) {
-                    showMessage('globalDefaultMessage', 'error', `必要人数の合計(${totalRequired}人)が従業員総数(${totalEmployees}人)を超えています`);
+                    showMessage('globalDefaultMessage', 'error', `⚠️ 総従業員数を超過しています。`);
+                    setButtonLoading(button, false);
                     return;
                 }
             } catch (error) {
                 console.error('従業員数取得エラー:', error);
+                showMessage('globalDefaultMessage', 'error', '従業員数の取得に失敗しました');
+                setButtonLoading(button, false);
+                return;
             }
 
             try {
@@ -544,15 +620,22 @@
                 }
             } catch (error) {
                 showMessage('globalDefaultMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                setButtonLoading(button, false);
             }
         }
 
         // シフト確定日設定保存
         async function saveConfirmationSettings() {
+            const button = event.target;
+            setButtonLoading(button, true);
+            showMessage('confirmationMessage', 'error', '処理中...');
+            
             const day = parseInt(document.getElementById('confirmationDay').value);
             
             if (!day || day < 1 || day > 31) {
                 showMessage('confirmationMessage', 'error', '有効な日付を入力してください（1-31）');
+                setButtonLoading(button, false);
                 return;
             }
 
@@ -578,6 +661,8 @@
                 }
             } catch (error) {
                 showMessage('confirmationMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                setButtonLoading(button, false);
             }
         }
 
@@ -588,9 +673,12 @@
                 if (response.ok) {
                     const settings = await response.json();
                     document.getElementById('confirmationDay').value = settings.confirmation_day || 25;
+                } else {
+                    document.getElementById('confirmationDay').value = 25;
                 }
             } catch (error) {
-                console.log('確定日設定なし');
+                console.log('確定日設定なし、デフォルト值使用');
+                document.getElementById('confirmationDay').value = 25;
             }
         }
 

@@ -105,27 +105,34 @@ def get_global_default_requirements():
             }
     except Exception as e:
         return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({})
+        }
+
+def save_global_default_requirements(event):
+    try:
+        data = json.loads(event['body'])
+        
+        item = {
+            'PK': 'REQUIREMENTS',
+            'SK': 'GLOBAL_DEFAULT',
+            'requirements': data
+        }
+        
+        table.put_item(Item=item)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'message': 'Global default requirements saved'})
+        }
+    except Exception as e:
+        return {
             'statusCode': 500,
             'headers': {'Content-Type': 'application/json'},
             'body': json.dumps({'error': str(e)})
         }
-
-def save_global_default_requirements(event):
-    data = json.loads(event['body'])
-    
-    item = {
-        'PK': 'REQUIREMENTS',
-        'SK': 'GLOBAL_DEFAULT',
-        'requirements': data
-    }
-    
-    table.put_item(Item=item)
-    
-    return {
-        'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
-        'body': json.dumps({'message': 'Global default requirements saved'})
-    }
 
 def get_monthly_requirements(month):
     try:
@@ -237,21 +244,28 @@ def get_confirmation_settings():
         }
 
 def save_confirmation_settings(event):
-    data = json.loads(event['body'])
-    
-    item = {
-        'PK': 'SETTINGS',
-        'SK': 'CONFIRMATION',
-        'confirmation_day': data['confirmation_day']
-    }
-    
-    table.put_item(Item=item)
-    
-    return {
-        'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
-        'body': json.dumps({'message': 'Confirmation settings saved'})
-    }
+    try:
+        data = json.loads(event['body'])
+        
+        item = {
+            'PK': 'SETTINGS',
+            'SK': 'CONFIRMATION',
+            'confirmation_day': data['confirmation_day']
+        }
+        
+        table.put_item(Item=item)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'message': 'Confirmation settings saved'})
+        }
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'error': str(e)})
+        }
 
 def get_vacation_default():
     try:
