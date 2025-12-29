@@ -27,7 +27,7 @@
             align-items: center;
         }
         .back-btn {
-            background: #6c757d;
+            background: #007bff;
             color: white;
             border: none;
             padding: 10px 20px;
@@ -37,7 +37,7 @@
             display: inline-block;
         }
         .back-btn:hover {
-            background: #5a6268;
+            background: #0056b3;
         }
         .section {
             background: white;
@@ -962,8 +962,8 @@
                         const empName = employeesMap[s.employee_id] || s.employee_id;
                         const disabledAttr = s._preview ? 'disabled title="プレビュー中のため操作不可"' : '';
                         const chkId = s.shift_id ? `chk_${s.shift_id}` : `chk_preview_${btoa(s.date + s.task_type).replace(/=/g,'')}`;
-                        return `<div style="padding:6px 6px 6px 0;border-bottom:1px solid #eee;display:flex;align-items:flex-start;gap:8px;">` +
-                            `<input type="checkbox" class="shift-checkbox" id="${chkId}" data-shift-id="${s.shift_id||''}" ${disabledAttr} onchange="onShiftCheckboxChange(this, '${s.shift_id||''}')" style="margin-top: 2px; align-self: flex-start;">` +
+                        return `<div style="padding:6px 0 6px 0;border-bottom:1px solid #eee;display:flex;align-items:flex-start;gap:8px;">` +
+                            `<input type="checkbox" class="shift-checkbox" id="${chkId}" data-shift-id="${s.shift_id||''}" ${disabledAttr} onchange="onShiftCheckboxChange(this, '${s.shift_id||''}')" style="margin-top: 3px; flex-shrink: 0;">` +
                             `<div style="flex:1">` +
                             `<strong>${getTaskName(s.task_type)}${s._preview? ' (プレビュー)':''}</strong><br>` +
                             `${empName} ${s.start_time || ''} - ${s.end_time || ''}` +

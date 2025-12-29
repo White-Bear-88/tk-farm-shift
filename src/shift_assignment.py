@@ -241,7 +241,11 @@ def generate_day_shifts(date, requirements, employees, overwrite=True):
             }
             
             # 冪等性を保つための保存
-            if save_shift_assignment_safe(shift, overwrite):
+            if overwrite:
+                if save_shift_assignment_safe(shift, True):
+                    shifts.append(shift)
+            else:
+                # プレビューモードの場合は保存せずに返す
                 shifts.append(shift)
     
     return shifts

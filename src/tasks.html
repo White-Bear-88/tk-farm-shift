@@ -27,22 +27,17 @@
             align-items: center;
         }
         .back-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #007bff;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
+            padding: 10px 20px;
+            border-radius: 5px;
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
-            font-weight: 600;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
         }
         .back-btn:hover {
-            background: linear-gradient(135deg, #5568d3 0%, #63408a 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+            background: #0056b3;
         }
         .section {
             background: white;
@@ -220,8 +215,11 @@
         <div class="section">
             <h2>作業人数（デフォルト値）</h2>
             <div id="globalDefaultRequirements"></div>
-            <button onclick="saveGlobalDefaultRequirements()">保存</button>
-            <div id="globalDefaultMessage"></div>
+            <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
+                <button onclick="saveGlobalDefaultRequirements()">保存</button>
+                <div id="globalDefaultMessage"></div>
+            </div>
+            <div id="globalDefaultValidation" style="margin-top: 10px;"></div>
         </div>
 
         <div class="section">
@@ -551,7 +549,7 @@
                 const employees = await employeesResponse.json();
                 const totalEmployees = employees.length;
                 
-                const messageDiv = document.getElementById('globalDefaultMessage');
+                const messageDiv = document.getElementById('globalDefaultValidation');
                 if (totalRequired > totalEmployees) {
                     messageDiv.innerHTML = `<div class="message error">⚠️ 総従業員数を超過しています。</div>`;
                     return false;
@@ -611,9 +609,10 @@
                 
                 if (response.ok) {
                     showMessage('globalDefaultMessage', 'success', '✓ デフォルト人数を保存しました');
-                    // メッセージを3秒後に消去
+                    // メッセージを3秒後に消去してバリデーションメッセージを再表示
                     setTimeout(() => {
                         document.getElementById('globalDefaultMessage').innerHTML = '';
+                        validateTotalRequirements();
                     }, 3000);
                 } else {
                     throw new Error('保存に失敗しました');

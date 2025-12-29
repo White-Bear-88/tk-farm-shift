@@ -8,7 +8,12 @@ def lambda_handler(event, context):
     
     # faviconリクエストの場合は実際のファイルを返す
     if path == '/favicon.ico':
-        favicon_path = os.path.join(os.path.dirname(__file__), 'favicon.ico')
+        # Lambda環境では/var/task/がルートディレクトリ
+        favicon_path = '/var/task/favicon.ico'
+        # ローカル開発環境用のフォールバック
+        if not os.path.exists(favicon_path):
+            favicon_path = os.path.join(os.path.dirname(__file__), 'favicon.ico')
+        
         try:
             with open(favicon_path, 'rb') as f:
                 favicon_data = f.read()

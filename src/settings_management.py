@@ -238,9 +238,9 @@ def get_confirmation_settings():
             }
     except Exception as e:
         return {
-            'statusCode': 500,
+            'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'error': str(e)})
+            'body': json.dumps({'confirmation_day': 25})
         }
 
 def save_confirmation_settings(event):
