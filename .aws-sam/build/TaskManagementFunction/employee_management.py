@@ -78,9 +78,30 @@ def create_employee(event):
     try:
         data = json.loads(event['body'])
         
+        # 常に自動採番（ユーザー入力は受け付けない）
+        # 既存の従業員IDを取得して最大値+1を採番
+        response = table.query(
+            KeyConditionExpression='PK = :pk',
+            ExpressionAttributeValues={':pk': 'EMPLOYEE'},
+            ProjectionExpression='SK'
+        )
+        
+        max_id = 0
+        for item in response.get('Items', []):
+            try:
+                # 数値として解釈できるIDの最大値を取得
+                current_id = int(item['SK'])
+                max_id = max(max_id, current_id)
+            except (ValueError, KeyError):
+                # 数値でないIDはスキップ
+                pass
+        
+        # 次のIDを3桁ゼロ埋めで生成
+        employee_id = f"{max_id + 1:03d}"
+        
         item = {
             'PK': 'EMPLOYEE',
-            'SK': data['employee_id'],
+            'SK': employee_id,
             'name': data['name'],
             'phone': data.get('phone', ''),
             'email': data.get('email', ''),
@@ -93,7 +114,7 @@ def create_employee(event):
         return {
             'statusCode': 201,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'message': '従業員を作成しました', 'employee_id': data['employee_id']})
+            'body': json.dumps({'message': '従業員を作成しました', 'employee_id': employee_id})
         }
     except Exception as e:
         return {

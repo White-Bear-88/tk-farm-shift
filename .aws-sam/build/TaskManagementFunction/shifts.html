@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>シフト管理 - 酪農シフト管理システム</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -504,12 +505,7 @@
         function updateGenerateButtons() {
             const monthValue = document.getElementById('calendarMonth').value;
             const disabled = isMonthInPast(monthValue);
-            const btn1 = document.getElementById('generateMonthBtn');
             const btn2 = document.getElementById('generateMonthBtn2');
-            if (btn1) {
-                btn1.disabled = disabled;
-                btn1.title = disabled ? '過去月のため自動生成できません' : '';
-            }
             if (btn2) {
                 btn2.disabled = disabled;
                 btn2.title = disabled ? '過去月のため自動生成できません' : '';
@@ -592,18 +588,15 @@
         // Processing state helper
         window.isProcessing = false;
         function updateProcessingUI() {
-            const genBtn = document.getElementById('generateMonthBtn');
             const genBtn2 = document.getElementById('generateMonthBtn2');
             const commitBtn = document.getElementById('commitPreviewBtn');
             const cancelBtn = document.getElementById('cancelPreviewBtn');
 
             if (window.isProcessing) {
-                if (genBtn) { genBtn.disabled = true; genBtn.dataset.prevText = genBtn.innerHTML; genBtn.innerHTML = '<span class="spinner"></span>処理中'; }
                 if (genBtn2) { genBtn2.disabled = true; genBtn2.dataset.prevText = genBtn2.innerHTML; genBtn2.innerHTML = '<span class="spinner"></span>処理中'; }
                 if (commitBtn) { commitBtn.disabled = true; commitBtn.dataset.prevText = commitBtn.innerHTML; commitBtn.innerHTML = '<span class="spinner"></span>登録中'; }
                 if (cancelBtn) { cancelBtn.disabled = true; }
             } else {
-                if (genBtn && genBtn.dataset.prevText) { genBtn.disabled = false; genBtn.innerHTML = genBtn.dataset.prevText; genBtn.dataset.prevText = ''; }
                 if (genBtn2 && genBtn2.dataset.prevText) { genBtn2.disabled = false; genBtn2.innerHTML = genBtn2.dataset.prevText; genBtn2.dataset.prevText = ''; }
                 if (commitBtn && commitBtn.dataset.prevText) { commitBtn.disabled = false; commitBtn.innerHTML = commitBtn.dataset.prevText; commitBtn.dataset.prevText = ''; }
                 if (cancelBtn) { cancelBtn.disabled = false; }
@@ -762,9 +755,12 @@
         // デフォルト日付設定
         function setDefaultDates() {
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('shiftDate').value = today;
-            document.getElementById('searchDate').value = today;
-            document.getElementById('assignDate').value = today;
+            const shiftDateEl = document.getElementById('shiftDate');
+            if (shiftDateEl) shiftDateEl.value = today;
+            const searchDateEl = document.getElementById('searchDate');
+            if (searchDateEl) searchDateEl.value = today;
+            const assignDateEl = document.getElementById('assignDate');
+            if (assignDateEl) assignDateEl.value = today;
         }
 
         // シフト作成・更新

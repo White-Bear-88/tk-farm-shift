@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>従業員管理 - 酪農シフト管理システム</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -162,10 +163,7 @@
             <h2>従業員登録・編集</h2>
             <form id="employeeForm">
                 <input type="hidden" id="employeeId">
-                <div class="form-group">
-                    <label>従業員ID:</label>
-                    <input type="text" id="empId" placeholder="例: 001" required>
-                </div>
+                <input type="hidden" id="empId">
                 <div class="form-group">
                     <label>氏名:</label>
                     <input type="text" id="empName" placeholder="例: 田中太郎" required>
@@ -204,7 +202,7 @@
                         </div>
                     </div>
                 </div>
-                <button type="submit" id="submitBtn">従業員登録</button>
+                <button type="submit" id="submitBtn">登録</button>
                 <button type="button" onclick="resetForm()">リセット</button>
             </form>
             <div id="formMessage"></div>
@@ -212,7 +210,6 @@
 
         <div class="section">
             <h2>従業員一覧</h2>
-            <button onclick="loadEmployees()">一覧更新</button>
             <div id="employeeList" class="employee-list"></div>
         </div>
     </div>
@@ -245,16 +242,22 @@
                 }
             }
 
+            const employeeId = document.getElementById('empId').value;
+            const isEdit = document.getElementById('employeeId').value;
+            
             const data = {
-                employee_id: document.getElementById('empId').value,
                 name: document.getElementById('empName').value,
                 phone: document.getElementById('empPhone').value,
                 email: document.getElementById('empEmail').value,
                 skills: skills,
                 vacation_days: vacationDays
             };
+            
+            // 編集時のみemployee_idを追加
+            if (isEdit) {
+                data.employee_id = employeeId;
+            }
 
-            const isEdit = document.getElementById('employeeId').value;
             const method = isEdit ? 'PUT' : 'POST';
             const url = isEdit ? `${API_BASE}/employees/${isEdit}` : `${API_BASE}/employees`;
 
@@ -329,7 +332,7 @@
                         cb.checked = emp.skills && emp.skills.includes(cb.value);
                     });
                     
-                    document.getElementById('submitBtn').textContent = '従業員更新';
+                    document.getElementById('submitBtn').textContent = '更新';
                     window.scrollTo(0, 0);
                 })
                 .catch(error => showMessage('formMessage', 'error', `エラー: ${error.message}`));
@@ -359,7 +362,8 @@
         function resetForm() {
             document.getElementById('employeeForm').reset();
             document.getElementById('employeeId').value = '';
-            document.getElementById('submitBtn').textContent = '従業員登録';
+            document.getElementById('empId').value = '';
+            document.getElementById('submitBtn').textContent = '登録';
         }
 
         function showMessage(elementId, type, message) {
