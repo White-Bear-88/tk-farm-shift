@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>酪農シフト管理システム - メニュー</title>
+    <title>管理者用メニュー - 酪農シフト管理システム</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <style>
         body {
@@ -14,7 +14,7 @@
             min-height: 100vh;
         }
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 40px 20px;
         }
@@ -32,6 +32,22 @@
             font-size: 1.2em;
             margin: 10px 0 0 0;
             opacity: 0.9;
+        }
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 10px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover {
+            background: white;
+            color: #667eea;
         }
         .menu-grid {
             display: grid;
@@ -85,24 +101,40 @@
 </head>
 <body>
     <div class="container">
+        <a href="menu.html" class="back-btn">← メインメニューに戻る</a>
+        
         <div class="header">
-            <h1> 酪農シフト管理システム</h1>
-            <p>従業員とシフトを効率的に管理</p>
+            <h1>⚙️ 管理者用メニュー</h1>
+            <p>システム管理と各種設定</p>
         </div>
 
         <div class="menu-grid">
-            <div class="menu-card" onclick="navigateTo('employee-view.html')">
-                <span class="menu-icon"></span>
-                <h3>出勤スケジュール</h3>
-                <p>シフト確認休暇申請<br>有給取得状況の確認</p>
-                <button class="menu-button">出勤スケジュールへ</button>
+            <div class="menu-card" onclick="navigateTo('employees.html')">
+                <span class="menu-icon">👥</span>
+                <h3>従業員管理</h3>
+                <p>従業員の登録・編集・削除<br>スキルや勤務情報の管理</p>
+                <button class="menu-button">従業員管理へ</button>
             </div>
 
-            <div class="menu-card" onclick="navigateTo('admin-menu.html')">
-                <span class="menu-icon"></span>
-                <h3>管理者用メニュー</h3>
-                <p>従業員作業シフト管理<br>各種設定とレポート</p>
-                <button class="menu-button">管理者用メニューへ</button>
+            <div class="menu-card" onclick="navigateTo('tasks.html')">
+                <span class="menu-icon">🛠️</span>
+                <h3>作業管理</h3>
+                <p>作業種別と人数設定<br>作業時間の管理</p>
+                <button class="menu-button">作業管理へ</button>
+            </div>
+
+            <div class="menu-card" onclick="navigateTo('shifts.html')">
+                <span class="menu-icon">📅</span>
+                <h3>シフト管理</h3>
+                <p>日別シフト作成・編集<br>自動シフト割り当て</p>
+                <button class="menu-button">シフト管理へ</button>
+            </div>
+
+            <div class="menu-card" onclick="navigateTo('reports.html')">
+                <span class="menu-icon">📊</span>
+                <h3>レポート・分析</h3>
+                <p>勤務実績の確認<br>作業効率の分析</p>
+                <button class="menu-button">レポートへ</button>
             </div>
         </div>
     </div>

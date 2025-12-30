@@ -61,6 +61,7 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 14px;
+            text-align: center;
         }
         .checkbox-group {
             display: flex;
@@ -177,26 +178,32 @@
     <div class="container">
         <div class="header">
             <h1>👥 従業員管理</h1>
-            <a href="menu.html" class="back-btn">← メニューに戻る</a>
+            <a href="admin-menu.html" class="back-btn">← 管理者用メニューに戻る</a>
         </div>
 
         <div class="section">
-            <h2>有給休暇デフォルト設定</h2>
+            <h2>従業員一覧 <span id="employeeCount" style="font-size: 0.9em; color: #666;"></span></h2>
+            <div style="margin-bottom: 20px;">
+                <button onclick="openEmployeeModal()">追加</button>
+            </div>
+            <div id="employeeListSpinner" style="display: none; text-align: center; padding: 40px;">
+                <div style="font-size: 48px;">🔄</div>
+                <p>読み込み中...</p>
+            </div>
+            <div id="employeeList" class="employee-list"></div>
+        </div>
+
+        <div class="section">
+            <h2>年間有給休暇日数（規定値）</h2>
             <div class="form-group">
-                <label>年間有給休暇日数（デフォルト）:</label>
-                <input type="number" id="defaultVacationDays" min="0" value="20" placeholder="20">
-                <span>日</span>
+                <label>年間有給休暇日数（規定値）:</label>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="number" id="defaultVacationDays" min="0" value="20" placeholder="20" style="width: 80px;">
+                    <span>日</span>
+                </div>
             </div>
             <button onclick="saveDefaultVacation()">保存</button>
             <div id="vacationDefaultMessage"></div>
-        </div>
-
-        <div class="section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>従業員一覧 <span id="employeeCount" style="font-size: 0.9em; color: #666;"></span></h2>
-                <button onclick="openEmployeeModal()">追加</button>
-            </div>
-            <div id="employeeList" class="employee-list"></div>
         </div>
 
         <!-- 従業員登録・編集モーダル -->
@@ -246,7 +253,7 @@
                         </div>
                     </div>
                     <button type="submit" id="submitBtn">登録</button>
-                    <button type="button" onclick="resetForm()">リセット</button>
+                    <button type="button" onclick="closeEmployeeModal()">戻る</button>
                 </form>
                 <div id="formMessage"></div>
             </div>
@@ -295,6 +302,14 @@
             const submitBtn = document.getElementById('submitBtn');
             const originalText = submitBtn.textContent;
             const isEdit = document.getElementById('employeeId').value;
+            
+            // 編集時は確認メッセージを表示
+            if (isEdit) {
+                if (!confirm('この従業員情報を更新しますか？')) {
+                    return;
+                }
+            }
+            
             submitBtn.textContent = isEdit ? '🔄 更新中...' : '🔄 登録中...';
             setButtonLoading(submitBtn, true);
             
@@ -364,7 +379,14 @@
 
         // 従業員一覧読み込み
         async function loadEmployees() {
+            const spinner = document.getElementById('employeeListSpinner');
+            const listDiv = document.getElementById('employeeList');
+            
             try {
+                // スピナーを表示
+                spinner.style.display = 'block';
+                listDiv.style.display = 'none';
+                
                 const response = await fetch(`${API_BASE}/employees`);
                 const employees = await response.json();
                 
@@ -372,7 +394,9 @@
                 const countSpan = document.getElementById('employeeCount');
                 countSpan.textContent = `（総人数: ${employees.length}人）`;
                 
-                const listDiv = document.getElementById('employeeList');
+                // スピナーを非表示、リストを表示
+                spinner.style.display = 'none';
+                listDiv.style.display = 'grid';
                 if (employees.length === 0) {
                     listDiv.innerHTML = '<p>登録された従業員がありません</p>';
                     return;
@@ -394,7 +418,10 @@
                     </div>
                 `).join('');
             } catch (error) {
-                document.getElementById('employeeList').innerHTML = 
+                // エラー時もスピナーを非表示にしてリストを表示
+                spinner.style.display = 'none';
+                listDiv.style.display = 'grid';
+                listDiv.innerHTML = 
                     `<div class="error">エラー: ${error.message}</div>`;
             }
         }

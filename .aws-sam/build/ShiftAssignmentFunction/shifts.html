@@ -66,6 +66,7 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 14px;
+            text-align: center;
         }
         button {
             background: #007bff;
@@ -313,7 +314,23 @@
     <div class="container">
         <div class="header">
             <h1>📅 シフト管理</h1>
-            <a href="menu.html" class="back-btn">← メニューに戻る</a>
+            <a href="admin-menu.html" class="back-btn">← 管理者用メニューに戻る</a>
+        </div>
+
+        <div class="section">
+            <h2>シフト確定日設定</h2>
+            <div class="form-group">
+                <label>翌月シフト確定日:</label>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="number" id="confirmationDay" min="1" max="31" value="25" placeholder="25" style="width: 80px;">
+                    <span>日</span>
+                </div>
+            </div>
+            <p style="color: #666; font-size: 14px;">
+                例: 25日に設定すると、毎月25日に翌月のシフトが確定されます。
+            </p>
+            <button onclick="saveConfirmationSettings()">保存</button>
+            <div id="confirmationMessage"></div>
         </div>
 
 
@@ -383,17 +400,17 @@
                         <div class="form-group">
                             <label>開始時間:</label>
                             <div style="display: flex; gap: 3px; align-items: center;">
-                                <select id="morningStartHour" style="width: 60px;"></select>
+                                <input type="text" id="morningStartHour" style="width: 60px; text-align: center;" list="hour-options">
                                 <span>:</span>
-                                <select id="morningStartMinute" style="width: 60px;"></select>
+                                <input type="text" id="morningStartMinute" style="width: 60px; text-align: center;" list="minute-options">
                             </div>
                         </div>
                         <div class="form-group">
                             <label>終了時間:</label>
                             <div style="display: flex; gap: 3px; align-items: center;">
-                                <select id="morningEndHour" style="width: 60px;"></select>
+                                <input type="text" id="morningEndHour" style="width: 60px; text-align: center;" list="hour-options">
                                 <span>:</span>
-                                <select id="morningEndMinute" style="width: 60px;"></select>
+                                <input type="text" id="morningEndMinute" style="width: 60px; text-align: center;" list="minute-options">
                             </div>
                         </div>
                     </div>
@@ -412,17 +429,17 @@
                         <div class="form-group">
                             <label>開始時間:</label>
                             <div style="display: flex; gap: 3px; align-items: center;">
-                                <select id="afternoonStartHour" style="width: 60px;"></select>
+                                <input type="text" id="afternoonStartHour" style="width: 60px; text-align: center;" list="hour-options">
                                 <span>:</span>
-                                <select id="afternoonStartMinute" style="width: 60px;"></select>
+                                <input type="text" id="afternoonStartMinute" style="width: 60px; text-align: center;" list="minute-options">
                             </div>
                         </div>
                         <div class="form-group">
                             <label>終了時間:</label>
                             <div style="display: flex; gap: 3px; align-items: center;">
-                                <select id="afternoonEndHour" style="width: 60px;"></select>
+                                <input type="text" id="afternoonEndHour" style="width: 60px; text-align: center;" list="hour-options">
                                 <span>:</span>
-                                <select id="afternoonEndMinute" style="width: 60px;"></select>
+                                <input type="text" id="afternoonEndMinute" style="width: 60px; text-align: center;" list="minute-options">
                             </div>
                         </div>
                     </div>
@@ -440,10 +457,10 @@
                     <select id="taskSelect">
                         <option value="">作業を選択</option>
                     </select>
-                    <select id="startHour"></select>
-                    <select id="startMinute"></select>
-                    <select id="endHour"></select>
-                    <select id="endMinute"></select>
+                    <input type="text" id="startHour" list="hour-options">
+                    <input type="text" id="startMinute" list="minute-options">
+                    <input type="text" id="endHour" list="hour-options">
+                    <input type="text" id="endMinute" list="minute-options">
                 </div>
                 
                 <input type="hidden" id="shiftStatus" value="active">
@@ -466,6 +483,146 @@
         let previewMonth = null;
         let previewShifts = [];
 
+        // ボタンの処理中状態を管理
+        function setButtonLoading(button, loading) {
+            if (loading) {
+                button.disabled = true;
+                button.style.opacity = '0.6';
+            } else {
+                button.disabled = false;
+                button.style.opacity = '1';
+            }
+        }
+
+        // シフト確定日設定保存
+        async function saveConfirmationSettings() {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '🔄 更新中...';
+            setButtonLoading(button, true);
+            
+            const day = parseInt(document.getElementById('confirmationDay').value);
+            
+            if (!day || day < 1 || day > 31) {
+                showMessage('confirmationMessage', 'error', '有効な日付を入力してください（1-31）');
+                setButtonLoading(button, false);
+                return;
+            }
+
+            const data = {
+                confirmation_day: day
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/settings/confirmation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    showMessage('confirmationMessage', 'success', '✓ シフト確定日を更新しました');
+                    setTimeout(() => {
+                        document.getElementById('confirmationMessage').innerHTML = '';
+                    }, 3000);
+                } else {
+                    throw new Error('設定に失敗しました');
+                }
+            } catch (error) {
+                showMessage('confirmationMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                button.textContent = originalText;
+                setButtonLoading(button, false);
+            }
+        }
+
+        // シフト確定日設定読み込み
+        async function loadConfirmationSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/settings/confirmation`);
+                if (response.ok) {
+                    const settings = await response.json();
+                    document.getElementById('confirmationDay').value = settings.confirmation_day || 25;
+                } else {
+                    document.getElementById('confirmationDay').value = 25;
+                }
+            } catch (error) {
+                console.log('確定日設定なし、デフォルト値使用');
+                document.getElementById('confirmationDay').value = 25;
+            }
+        }
+
+        function showMessage(elementId, type, message) {
+            const messageDiv = document.getElementById(elementId);
+            messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
+            setTimeout(() => messageDiv.innerHTML = '', 5000);
+        }
+
+
+        // シフト確定日設定保存
+        async function saveConfirmationSettings() {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '🔄 更新中...';
+            setButtonLoading(button, true);
+            
+            const day = parseInt(document.getElementById('confirmationDay').value);
+            
+            if (!day || day < 1 || day > 31) {
+                showMessage('confirmationMessage', 'error', '有効な日付を入力してください（1-31）');
+                setButtonLoading(button, false);
+                return;
+            }
+
+            const data = {
+                confirmation_day: day
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/settings/confirmation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    showMessage('confirmationMessage', 'success', '✓ シフト確定日を更新しました');
+                    setTimeout(() => {
+                        document.getElementById('confirmationMessage').innerHTML = '';
+                    }, 3000);
+                } else {
+                    throw new Error('設定に失敗しました');
+                }
+            } catch (error) {
+                showMessage('confirmationMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                button.textContent = originalText;
+                setButtonLoading(button, false);
+            }
+        }
+
+        // シフト確定日設定読み込み
+        async function loadConfirmationSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/settings/confirmation`);
+                if (response.ok) {
+                    const settings = await response.json();
+                    document.getElementById('confirmationDay').value = settings.confirmation_day || 25;
+                } else {
+                    document.getElementById('confirmationDay').value = 25;
+                }
+            } catch (error) {
+                console.log('確定日設定なし、デフォルト値使用');
+                document.getElementById('confirmationDay').value = 25;
+            }
+        }
+
+        function showMessage(elementId, type, message) {
+            const messageDiv = document.getElementById(elementId);
+            messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
+            setTimeout(() => messageDiv.innerHTML = '', 5000);
+        }
+
         // 時間の選択肢を生成（00〜23）
         function generateHourOptions() {
             const options = [];
@@ -475,62 +632,172 @@
             return options;
         }
 
-        // 分の選択肢を生成（15分刻み）
+        // 分の選択肢を生成（5分刻み）
         function generateMinuteOptions() {
-            return ['00', '10', '20', '30', '40', '50'];
+            const options = [];
+            for (let m = 0; m < 60; m += 5) {
+                options.push(String(m).padStart(2, '0'));
+            }
+            return options;
         }
 
-        // selectタグに時間オプションを追加
-        function populateHourSelect(selectElement, selectedValue = '') {
+        // 時間入力のバリデーション
+        function validateHourInput(input) {
+            const value = input.value.trim();
+            
+            // 空の場合はOK
+            if (value === '') return true;
+            
+            // 数字以外が含まれている場合
+            if (!/^\d+$/.test(value)) {
+                alert('時間は数字のみ入力してください');
+                input.value = '';
+                input.focus();
+                return false;
+            }
+            
+            const hour = parseInt(value, 10);
+            
+            // 範囲外の場合
+            if (hour < 0 || hour > 23) {
+                alert('時間は0から23の範囲で入力してください');
+                input.value = '';
+                input.focus();
+                return false;
+            }
+            
+            // 正しい形式に補正
+            input.value = String(hour).padStart(2, '0');
+            return true;
+        }
+
+        // 分入力のバリデーションと5分刻みへの補正
+        function validateMinuteInput(input) {
+            const value = input.value.trim();
+            
+            // 空の場合はOK
+            if (value === '') return true;
+            
+            // 数字以外が含まれている場合
+            if (!/^\d+$/.test(value)) {
+                alert('分は数字のみ入力してください');
+                input.value = '';
+                input.focus();
+                return false;
+            }
+            
+            const minute = parseInt(value, 10);
+            
+            // 範囲外の場合
+            if (minute < 0 || minute > 59) {
+                alert('分は0から59の範囲で入力してください');
+                input.value = '';
+                input.focus();
+                return false;
+            }
+            
+            // 5分刻みに補正
+            const correctedMinute = Math.round(minute / 5) * 5;
+            input.value = String(correctedMinute === 60 ? 0 : correctedMinute).padStart(2, '0');
+            return true;
+        }
+
+        // input要素に時間オプションをdatalistで設定
+        function setupHourInput(inputElement, selectedValue = '') {
+            const datalistId = inputElement.id + '_datalist';
+            let datalist = document.getElementById(datalistId);
+            
+            if (!datalist) {
+                datalist = document.createElement('datalist');
+                datalist.id = datalistId;
+                inputElement.setAttribute('list', datalistId);
+                document.body.appendChild(datalist);
+            }
+            
+            datalist.innerHTML = '';
             const options = generateHourOptions();
-            selectElement.innerHTML = '<option value="">--</option>';
             options.forEach(hour => {
                 const option = document.createElement('option');
                 option.value = hour;
-                option.textContent = hour;
-                if (hour === selectedValue) {
-                    option.selected = true;
-                }
-                selectElement.appendChild(option);
+                datalist.appendChild(option);
             });
+            
+            if (selectedValue !== '') {
+                inputElement.value = selectedValue;
+            }
+            
+            // バリデーション設定
+            inputElement.removeEventListener('blur', hourBlurHandler);
+            inputElement.addEventListener('blur', hourBlurHandler);
         }
 
-        // selectタグに分オプションを追加
-        function populateMinuteSelect(selectElement, selectedValue = '') {
+        function hourBlurHandler(e) {
+            validateHourInput(e.target);
+        }
+
+        // input要素に分オプションをdatalistで設定
+        function setupMinuteInput(inputElement, selectedValue = '') {
+            const datalistId = inputElement.id + '_datalist';
+            let datalist = document.getElementById(datalistId);
+            
+            if (!datalist) {
+                datalist = document.createElement('datalist');
+                datalist.id = datalistId;
+                inputElement.setAttribute('list', datalistId);
+                document.body.appendChild(datalist);
+            }
+            
+            datalist.innerHTML = '';
             const options = generateMinuteOptions();
-            selectElement.innerHTML = '<option value="">--</option>';
             options.forEach(minute => {
                 const option = document.createElement('option');
                 option.value = minute;
-                option.textContent = minute;
-                if (minute === selectedValue) {
-                    option.selected = true;
-                }
-                selectElement.appendChild(option);
+                datalist.appendChild(option);
             });
+            
+            if (selectedValue !== '') {
+                inputElement.value = selectedValue;
+            }
+            
+            // バリデーション設定
+            inputElement.removeEventListener('blur', minuteBlurHandler);
+            inputElement.addEventListener('blur', minuteBlurHandler);
         }
 
-        // 時間文字列（HH:MM）から時と分を分離してselectに設定
-        function setTimeSelects(hourSelectId, minuteSelectId, timeValue) {
+        function minuteBlurHandler(e) {
+            validateMinuteInput(e.target);
+        }
+
+        // 時間文字列（HH:MM）から時と分を分離してinputに設定
+        function setTimeInputs(hourInputId, minuteInputId, timeValue) {
+            const hourInput = document.getElementById(hourInputId);
+            const minuteInput = document.getElementById(minuteInputId);
+            
             if (timeValue && timeValue.includes(':')) {
                 const [hour, minute] = timeValue.split(':');
-                populateHourSelect(document.getElementById(hourSelectId), hour);
-                populateMinuteSelect(document.getElementById(minuteSelectId), minute);
+                setupHourInput(hourInput, hour);
+                setupMinuteInput(minuteInput, minute);
             } else {
-                populateHourSelect(document.getElementById(hourSelectId), '');
-                populateMinuteSelect(document.getElementById(minuteSelectId), '');
+                setupHourInput(hourInput, '');
+                setupMinuteInput(minuteInput, '');
             }
         }
 
-        // 時と分のselectから時間文字列（HH:MM）を取得
-        function getTimeFromSelects(hourSelectId, minuteSelectId) {
-            const hour = document.getElementById(hourSelectId).value;
-            const minute = document.getElementById(minuteSelectId).value;
+        // 時と分のinputから時間文字列（HH:MM）を取得
+        function getTimeFromInputs(hourInputId, minuteInputId) {
+            const hour = document.getElementById(hourInputId).value;
+            const minute = document.getElementById(minuteInputId).value;
             if (hour && minute) {
                 return `${hour}:${minute}`;
             }
             return '';
         }
+
+        // 以前の関数名との互換性のため
+        const populateHourSelect = setupHourInput;
+        const populateMinuteSelect = setupMinuteInput;
+        const setTimeSelects = setTimeInputs;
+        const getTimeFromSelects = getTimeFromInputs;
 
         // ボタンの処理中状態を管理
         function setButtonLoading(button, loading) {
@@ -547,6 +814,9 @@
         document.addEventListener('DOMContentLoaded', async () => {
             // suppressModalOnLoad を初期化して、ナビ遷移時の不意なモーダル表示を防ぐ
             window.suppressModalOnLoad = true;
+
+            // シフト確定日設定を読み込み
+            loadConfirmationSettings();
 
             // 時刻selectを初期化
             setTimeSelects('morningStartHour', 'morningStartMinute', '');
@@ -812,7 +1082,6 @@
             console.log('使用する人数設定:', requirements);
 
             // Preview generation first (do not commit) — reflect on calendar instead of modal
-            setProcessing(true, 'プレビューを取得中...');
             try {
                 console.log('APIリクエストを送信中...');
                 const previewRes = await fetch(`${API_BASE}/shifts/generate-monthly`, {
@@ -859,8 +1128,10 @@
                 console.error('シフト生成エラー:', error);
                 showMessage('generateMessage', 'error', `エラー: ${error.message}`);
             } finally {
-                setProcessing(false);
-                if (button) setButtonLoading(button, false);
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
             }
         }
 
@@ -888,10 +1159,7 @@
             updateShiftCalendar();
 
             // Show persistent preview message with confirm/cancel
-            document.getElementById('generateMessage').innerHTML = `<div class="message success">${month} のプレビューをカレンダーに反映しました。<button id="commitPreviewBtn" class="btn-success" onclick="commitPreview(event)">確定（DBに登録）</button> <button id="cancelPreviewBtn" onclick="cancelPreview()" class="btn">取消</button></div>`;
-            // Ensure any processing state is cleared
-            window.isProcessing = false;
-            updateProcessingUI();
+            document.getElementById('generateMessage').innerHTML = `<div class="message success">${month} のプレビューをカレンダーに反映しました。<br><button id="commitPreviewBtn" class="btn-success" onclick="commitPreview(event)" style="margin-top: 10px;">確定（DBに登録）</button> <button id="cancelPreviewBtn" onclick="cancelPreview()" class="btn" style="margin-top: 10px;">取消</button></div>`;
         }
 
         // Processing state helper
@@ -1684,4 +1952,17 @@
 
     </script>
 </body>
+
+<!-- 時間選択用datalist -->
+<datalist id="hour-options">
+    <option value="00"><option value="01"><option value="02"><option value="03"><option value="04"><option value="05">
+    <option value="06"><option value="07"><option value="08"><option value="09"><option value="10"><option value="11">
+    <option value="12"><option value="13"><option value="14"><option value="15"><option value="16"><option value="17">
+    <option value="18"><option value="19"><option value="20"><option value="21"><option value="22"><option value="23">
+</datalist>
+<datalist id="minute-options">
+    <option value="00"><option value="05"><option value="10"><option value="15"><option value="20"><option value="25">
+    <option value="30"><option value="35"><option value="40"><option value="45"><option value="50"><option value="55">
+</datalist>
+
 </html>
