@@ -127,7 +127,8 @@
             border: 1px solid #f5c6cb;
         }
         .requirement-item {
-            display: flex;
+            display: grid;
+            grid-template-columns: 120px 80px auto 100px auto 100px auto;
             align-items: center;
             gap: 10px;
             margin: 10px 0;
@@ -137,11 +138,25 @@
             border: 1px solid #ddd;
         }
         .requirement-item label {
-            min-width: 100px;
             margin: 0;
         }
-        .requirement-item input {
-            width: 80px;
+        .requirement-item input[type="number"] {
+            width: 60px;
+        }
+        .requirement-item input[type="time"] {
+            width: 90px;
+        }
+        .requirement-header {
+            display: grid;
+            grid-template-columns: 120px 80px auto 100px auto 100px auto;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-weight: bold;
         }
         .form-row {
             display: grid;
@@ -213,13 +228,27 @@
 
 
         <div class="section">
-            <h2>作業人数（デフォルト値）</h2>
-            <div id="globalDefaultRequirements"></div>
+            <h2>作業人数（規定値）</h2>
+            
+            <!-- 午前シフト人数 -->
+            <h3>午前シフト人数</h3>
+            <div id="morningRequirements"></div>
+            <div id="morningValidation" style="margin-top: 10px;"></div>
+            
             <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
-                <button onclick="saveGlobalDefaultRequirements()">保存</button>
-                <div id="globalDefaultMessage"></div>
+                <button id="saveMorningRequirementsBtn" onclick="saveMorningRequirements()">午前シフト保存</button>
+                <div id="morningRequirementsMessage"></div>
             </div>
-            <div id="globalDefaultValidation" style="margin-top: 10px;"></div>
+            
+            <!-- 午後シフト人数 -->
+            <h3>午後シフト人数</h3>
+            <div id="afternoonRequirements"></div>
+            <div id="afternoonValidation" style="margin-top: 10px;"></div>
+            
+            <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
+                <button id="saveAfternoonRequirementsBtn" onclick="saveAfternoonRequirements()">午後シフト保存</button>
+                <div id="afternoonRequirementsMessage"></div>
+            </div>
         </div>
 
         <div class="section">
@@ -232,7 +261,7 @@
         <div id="taskModal" class="modal" style="display:none;">
             <div class="modal-content">
                 <span class="close" onclick="closeTaskModal()">&times;</span>
-                <h3>作業種別登録・編集</h3>
+                <h3>作業時間登録・編集</h3>
                 <form id="taskForm">
                     <input type="hidden" id="taskId">
                     <div class="form-group">
@@ -248,15 +277,23 @@
                         <textarea id="taskDescription" placeholder="作業の詳細説明を入力してください"></textarea>
                     </div>
                     <div class="form-group">
-                        <label>推奨開始時間:</label>
+                        <label>午前シフト作業時間:</label>
                         <div class="time-input">
-                            <input type="time" id="taskStartTime">
-                            <span>〜</span>
-                            <input type="time" id="taskEndTime">
+                            <input type="time" id="taskMorningStartTime" step="900">
+                            <span>　～　</span>
+                            <input type="time" id="taskMorningEndTime" step="900">
                         </div>
                     </div>
-                    <button type="submit" id="submitBtn">作業種別登録</button>
-                    <button type="button" onclick="resetForm()">リセット</button>
+                    <div class="form-group">
+                        <label>午後シフト作業時間:</label>
+                        <div class="time-input">
+                            <input type="time" id="taskAfternoonStartTime" step="900">
+                            <span>　～　</span>
+                            <input type="time" id="taskAfternoonEndTime" step="900">
+                        </div>
+                    </div>
+                    <button type="submit" id="submitBtn">登録</button>
+                    <button type="button" onclick="resetFormWithConfirm()">リセット</button>
                     <button type="button" id="cancelModalBtn" onclick="closeTaskModal()">キャンセル</button>
                 </form>
                 <div id="formMessage"></div>
@@ -280,25 +317,21 @@
             }
         }
 
-        // Generate a unique task id from name (romanized + timestamp if needed)
-        function generateTaskIdFromName(name) {
-            name = (name || '').trim();
-            if (!name) return '';
-            const map = {
-                '搾乳': 'milking',
-                '給餌': 'feeding',
-                '清掃': 'cleaning',
-                '見回り': 'patrol',
-                '点検': 'maintenance',
-                '健康チェック': 'health_check'
-            };
-            if (map[name]) return map[name];
-            try {
-                const normalized = name.normalize('NFKD').replace(/[^\w\s-]/g, '');
-                return normalized.replace(/\s+/g, '_').toLowerCase();
-            } catch (e) {
-                return name.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').toLowerCase();
-            }
+        // Generate next task ID (sequential number like employee ID)
+        let currentTasks = [];
+        
+        function generateNextTaskId() {
+            if (currentTasks.length === 0) return '1';
+            
+            // Extract numeric IDs and find the maximum
+            const numericIds = currentTasks
+                .map(task => parseInt(task.task_type))
+                .filter(id => !isNaN(id));
+            
+            if (numericIds.length === 0) return '1';
+            
+            const maxId = Math.max(...numericIds);
+            return String(maxId + 1);
         }
 
         // Task form submit
@@ -308,22 +341,33 @@
                 const taskName = document.getElementById('taskName').value.trim();
                 const isEdit = document.getElementById('taskId').value;
 
-                if (!taskName) { showMessage('error', '作業名を入力してください'); return; }
+                if (!taskName) { showMessage('formMessage', 'error', '作業名を入力してください'); return; }
+                
+                // 登録/更新確認
+                const confirmMessage = isEdit ? 'この作業種別を更新しますか？' : 'この作業種別を登録しますか？';
+                if (!confirm(confirmMessage)) return;
 
                 const submitBtn = document.getElementById('submitBtn');
+                
+                // 更新中表示（ボタンを無効化する前にメッセージを表示）
+                showMessage('formMessage', 'success', isEdit ? '更新中...' : '登録中...');
+                
                 setButtonLoading(submitBtn, true);
-                showMessage('error', '処理中...');
 
-                // Auto-generate ID from name (server will ensure uniqueness)
-                let genTaskType = generateTaskIdFromName(taskName);
-                if (!genTaskType) genTaskType = 'task_' + Date.now();
+                // Auto-generate sequential ID (like employee ID)
+                let genTaskType = isEdit ? document.getElementById('taskId').value : generateNextTaskId();
 
                 const data = {
                     task_type: genTaskType,
                     name: taskName,
                     description: document.getElementById('taskDescription').value,
-                    recommended_start_time: document.getElementById('taskStartTime').value,
-                    recommended_end_time: document.getElementById('taskEndTime').value
+                    morning_start_time: document.getElementById('taskMorningStartTime').value,
+                    morning_end_time: document.getElementById('taskMorningEndTime').value,
+                    afternoon_start_time: document.getElementById('taskAfternoonStartTime').value,
+                    afternoon_end_time: document.getElementById('taskAfternoonEndTime').value,
+                    // 後方互換性のため、午前の時間をデフォルトとして保持
+                    recommended_start_time: document.getElementById('taskMorningStartTime').value,
+                    recommended_end_time: document.getElementById('taskMorningEndTime').value
                 };
 
                 const method = isEdit ? 'PUT' : 'POST';
@@ -338,27 +382,28 @@
                     
                     if (response.ok) {
                         const result = await response.json();
-                        showMessage('success', isEdit ? '✓ 作業種別を更新しました。' : '✓ 作業種別を登録しました。');
-                        closeTaskModal();
-                        resetForm();
-                        loadTasks();
+                        showMessage('formMessage', 'success', isEdit ? '✓ 作業種別を更新しました' : '✓ 作業種別を登録しました');
+                        setTimeout(() => {
+                            closeTaskModal();
+                            resetForm();
+                            loadTasks();
+                        }, 1500);
                     } else {
                         const errText = await response.text().catch(()=>null);
                         throw new Error(errText || '操作に失敗しました');
                     }
                 } catch (error) {
-                    showMessage('error', `エラー: ${error.message}`);
+                    showMessage('formMessage', 'error', `エラー: ${error.message}`);
                 } finally {
                     setButtonLoading(submitBtn, false);
                 }
             });
 
-            // Auto-fill taskCode as user types name
+            // Auto-fill taskCode with next sequential number
             document.getElementById('taskName').addEventListener('input', (e) => {
                 const isEdit = document.getElementById('taskId').value;
                 if (!isEdit) {
-                    const gen = generateTaskIdFromName(e.target.value) || 'task_' + Date.now();
-                    document.getElementById('taskCode').value = gen;
+                    document.getElementById('taskCode').value = generateNextTaskId();
                 }
             });
         });
@@ -369,13 +414,24 @@
                 const response = await fetch(`${API_BASE}/tasks`);
                 const tasks = await response.json();
                 
+                // Store current tasks for ID generation
+                currentTasks = tasks;
+                
                 const listDiv = document.getElementById('taskList');
                 if (tasks.length === 0) {
                     listDiv.innerHTML = '<p>登録された作業種別がありません</p>';
                     return;
                 }
 
-                listDiv.innerHTML = tasks.map(task => `
+                listDiv.innerHTML = tasks.map(task => {
+                    const morningTime = task.morning_start_time && task.morning_end_time 
+                        ? `${task.morning_start_time}〜${task.morning_end_time}` 
+                        : '未設定';
+                    const afternoonTime = task.afternoon_start_time && task.afternoon_end_time 
+                        ? `${task.afternoon_start_time}〜${task.afternoon_end_time}` 
+                        : '未設定';
+                    
+                    return `
                     <div class="task-card">
                         <h4>
                             <span class="task-icon">${getTaskIcon(task.task_type)}</span>
@@ -384,10 +440,17 @@
                         <div class="task-info">
                             <strong>説明:</strong> ${task.description || '未設定'}
                         </div>
+                        <div class="task-info">
+                            <strong>午前作業時間:</strong> ${morningTime}
+                        </div>
+                        <div class="task-info">
+                            <strong>午後作業時間:</strong> ${afternoonTime}
+                        </div>
                         <button onclick="editTask('${task.task_type}')">編集</button>
                         <button class="btn-danger" onclick="deleteTask('${task.task_type}')">削除</button>
                     </div>
-                `).join('');
+                `;
+                }).join('');
             } catch (error) {
                 document.getElementById('taskList').innerHTML = 
                     `<div class="error">エラー: ${error.message}</div>`;
@@ -403,12 +466,14 @@
                     document.getElementById('taskCode').value = task.task_type;
                     document.getElementById('taskName').value = task.name;
                     document.getElementById('taskDescription').value = task.description || '';
-                    document.getElementById('taskStartTime').value = task.recommended_start_time || '';
-                    document.getElementById('taskEndTime').value = task.recommended_end_time || '';
-                    document.getElementById('submitBtn').textContent = '作業種別更新';
+                    document.getElementById('taskMorningStartTime').value = task.morning_start_time || task.recommended_start_time || '';
+                    document.getElementById('taskMorningEndTime').value = task.morning_end_time || task.recommended_end_time || '';
+                    document.getElementById('taskAfternoonStartTime').value = task.afternoon_start_time || '';
+                    document.getElementById('taskAfternoonEndTime').value = task.afternoon_end_time || '';
+                    document.getElementById('submitBtn').textContent = '更新';
                     document.getElementById('taskModal').style.display = 'block';
                 })
-                .catch(error => showMessage('error', `エラー: ${error.message}`));
+                .catch(error => showMessage('formMessage', 'error', `エラー: ${error.message}`));
         }
 
         // Delete task
@@ -417,18 +482,16 @@
             
             const button = event.target;
             setButtonLoading(button, true);
-            showMessage('error', '処理中...');
             
             try {
                 const response = await fetch(`${API_BASE}/tasks/${taskType}`, { method: 'DELETE' });
                 if (response.ok) {
-                    showMessage('success', '✓ 作業種別を削除しました。');
                     loadTasks();
                 } else {
                     throw new Error('削除に失敗しました');
                 }
             } catch (error) {
-                showMessage('error', `エラー: ${error.message}`);
+                alert(`エラー: ${error.message}`);
             } finally {
                 setButtonLoading(button, false);
             }
@@ -439,12 +502,25 @@
             document.getElementById('taskForm').reset();
             document.getElementById('taskId').value = '';
             document.getElementById('taskCode').value = '';
-            document.getElementById('submitBtn').textContent = '作業種別登録';
+            document.getElementById('submitBtn').textContent = '登録';
+        }
+        
+        // Reset form with confirmation
+        function resetFormWithConfirm() {
+            if (confirm('入力内容をリセットしますか？')) {
+                resetForm();
+                showMessage('formMessage', 'success', 'リセットしました');
+                setTimeout(() => {
+                    document.getElementById('formMessage').innerHTML = '';
+                }, 2000);
+            }
         }
 
         // Open modal for add
         function openTaskModalForAdd() {
             resetForm();
+            // Set next sequential ID
+            document.getElementById('taskCode').value = generateNextTaskId();
             document.getElementById('taskModal').style.display = 'block';
         }
 
@@ -454,9 +530,8 @@
             resetForm();
         }
 
-        // Show message
-        function showMessage(type, message) {
-            const messageDiv = document.getElementById('formMessage');
+        function showMessage(elementId, type, message) {
+            const messageDiv = document.getElementById(elementId);
             messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
             setTimeout(() => messageDiv.innerHTML = '', 5000);
         }
@@ -516,32 +591,96 @@
                     console.log('グローバルデフォルト設定なし、デフォルト值使用');
                 }
 
-                const container = document.getElementById('globalDefaultRequirements');
-                container.innerHTML = tasks.map(task => `
+                // 午前シフト人数と作業時間
+                const morningContainer = document.getElementById('morningRequirements');
+                let morningHTML = `
+                    <div class="requirement-header">
+                        <div>作業種別</div>
+                        <div>人数</div>
+                        <div></div>
+                        <div style="text-align: center;">作業時間（規定値）</div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                `;
+                morningHTML += tasks.map(task => `
                     <div class="requirement-item">
-                        <label>${task.name}:</label>
+                        <label>${task.name}</label>
                         <input type="number" min="0" value="${defaults[task.task_type] || task.required_people || 1}" 
                                data-task="${task.task_type}"
                                onchange="validateTotalRequirements()">
                         <span>人</span>
+                        <input type="time" step="900" 
+                               value="${task.morning_start_time || task.recommended_start_time || ''}"
+                               data-task="${task.task_type}"
+                               data-field="morning_start">
+                        <span>～</span>
+                        <input type="time" step="900" 
+                               value="${task.morning_end_time || task.recommended_end_time || ''}"
+                               data-task="${task.task_type}"
+                               data-field="morning_end">
+                        <span></span>
                     </div>
                 `).join('');
+                morningContainer.innerHTML = morningHTML;
+                
+                // 午後シフト人数と作業時間
+                const afternoonContainer = document.getElementById('afternoonRequirements');
+                let afternoonHTML = `
+                    <div class="requirement-header">
+                        <div>作業種別</div>
+                        <div>人数</div>
+                        <div></div>
+                        <div style="text-align: center;">作業時間（規定値）</div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                `;
+                afternoonHTML += tasks.map(task => `
+                    <div class="requirement-item">
+                        <label>${task.name}</label>
+                        <input type="number" min="0" value="${defaults[task.task_type] || task.required_people || 1}" 
+                               data-task="${task.task_type}"
+                               onchange="validateTotalRequirements()">
+                        <span>人</span>
+                        <input type="time" step="900" 
+                               value="${task.afternoon_start_time || ''}"
+                               data-task="${task.task_type}"
+                               data-field="afternoon_start">
+                        <span>～</span>
+                        <input type="time" step="900" 
+                               value="${task.afternoon_end_time || ''}"
+                               data-task="${task.task_type}"
+                               data-field="afternoon_end">
+                        <span></span>
+                    </div>
+                `).join('');
+                afternoonContainer.innerHTML = afternoonHTML;
                 
                 // 初期表示時にもチェック
                 validateTotalRequirements();
             } catch (error) {
-                console.error('グローバルデフォルト人数読み込みエラー:', error);
-                const container = document.getElementById('globalDefaultRequirements');
-                container.innerHTML = '<p>データの読み込みに失敗しました</p>';
+                console.error('人数設定読み込みエラー:', error);
+                const morningContainer = document.getElementById('morningRequirements');
+                const afternoonContainer = document.getElementById('afternoonRequirements');
+                if (morningContainer) morningContainer.innerHTML = '<p>データの読み込みに失敗しました</p>';
+                if (afternoonContainer) afternoonContainer.innerHTML = '<p>データの読み込みに失敗しました</p>';
             }
         }
 
         // 合計人数のリアルタイムバリデーション
         async function validateTotalRequirements() {
-            let totalRequired = 0;
-            document.querySelectorAll('#globalDefaultRequirements input[data-task]').forEach(input => {
-                const count = parseInt(input.value) || 0;
-                totalRequired += count;
+            let morningTotal = 0;
+            let afternoonTotal = 0;
+            
+            document.querySelectorAll('#morningRequirements input[type="number"][data-task]').forEach(input => {
+                morningTotal += parseInt(input.value) || 0;
+            });
+            
+            document.querySelectorAll('#afternoonRequirements input[type="number"][data-task]').forEach(input => {
+                afternoonTotal += parseInt(input.value) || 0;
             });
 
             try {
@@ -549,76 +688,170 @@
                 const employees = await employeesResponse.json();
                 const totalEmployees = employees.length;
                 
-                const messageDiv = document.getElementById('globalDefaultValidation');
-                if (totalRequired > totalEmployees) {
-                    messageDiv.innerHTML = `<div class="message error">⚠️ 総従業員数を超過しています。</div>`;
-                    return false;
-                } else if (totalRequired === totalEmployees) {
-                    messageDiv.innerHTML = `<div class="message success">✓ 必要人数の合計: ${totalRequired}人 / 従業員総数: ${totalEmployees}人（ちょうど）</div>`;
-                    return true;
-                } else {
-                    messageDiv.innerHTML = `<div class="message" style="background: #e7f3ff; color: #004085; border: 1px solid #b8daff;">必要人数の合計: ${totalRequired}人 / 従業員総数: ${totalEmployees}人</div>`;
-                    return true;
+                // エラー条件: 合計が0または総従業員数を超過
+                const morningHasError = morningTotal === 0 || morningTotal > totalEmployees;
+                const afternoonHasError = afternoonTotal === 0 || afternoonTotal > totalEmployees;
+                
+                // 午前保存ボタンの有効/無効を制御
+                const saveMorningBtn = document.getElementById('saveMorningRequirementsBtn');
+                if (saveMorningBtn) {
+                    saveMorningBtn.disabled = morningHasError;
+                    saveMorningBtn.style.opacity = morningHasError ? '0.6' : '1';
+                    saveMorningBtn.style.cursor = morningHasError ? 'not-allowed' : 'pointer';
                 }
+                
+                // 午後保存ボタンの有効/無効を制御
+                const saveAfternoonBtn = document.getElementById('saveAfternoonRequirementsBtn');
+                if (saveAfternoonBtn) {
+                    saveAfternoonBtn.disabled = afternoonHasError;
+                    saveAfternoonBtn.style.opacity = afternoonHasError ? '0.6' : '1';
+                    saveAfternoonBtn.style.cursor = afternoonHasError ? 'not-allowed' : 'pointer';
+                }
+                
+                // 午前メッセージ
+                const morningMessageDiv = document.getElementById('morningValidation');
+                if (morningTotal === 0) {
+                    morningMessageDiv.innerHTML = `<div class="message error">⚠️ 午前: 作業人数の合計が0人です。</div>`;
+                } else if (morningTotal > totalEmployees) {
+                    morningMessageDiv.innerHTML = `<div class="message error">⚠️ 午前: ${morningTotal}人 / 従業員総数: ${totalEmployees}人 - 総従業員数を超過しています。</div>`;
+                } else {
+                    morningMessageDiv.innerHTML = `<div class="message" style="background: #e7f3ff; color: #004085; border: 1px solid #b8daff;">午前: ${morningTotal}人 / 従業員総数: ${totalEmployees}人</div>`;
+                }
+                
+                // 午後メッセージ
+                const afternoonMessageDiv = document.getElementById('afternoonValidation');
+                if (afternoonTotal === 0) {
+                    afternoonMessageDiv.innerHTML = `<div class="message error">⚠️ 午後: 作業人数の合計が0人です。</div>`;
+                } else if (afternoonTotal > totalEmployees) {
+                    afternoonMessageDiv.innerHTML = `<div class="message error">⚠️ 午後: ${afternoonTotal}人 / 従業員総数: ${totalEmployees}人 - 総従業員数を超過しています。</div>`;
+                } else {
+                    afternoonMessageDiv.innerHTML = `<div class="message" style="background: #e7f3ff; color: #004085; border: 1px solid #b8daff;">午後: ${afternoonTotal}人 / 従業員総数: ${totalEmployees}人</div>`;
+                }
+                
+                return !morningHasError && !afternoonHasError;
             } catch (error) {
                 console.error('従業員数取得エラー:', error);
-                return true; // エラー時は保存を許可
+                return true;
             }
         }
 
-        // グローバルデフォルト人数保存
-        async function saveGlobalDefaultRequirements() {
+        // 午前シフト人数設定保存
+        async function saveMorningRequirements() {
             const button = event.target;
             setButtonLoading(button, true);
-            showMessage('globalDefaultMessage', 'error', '処理中...');
             
-            const requirements = {};
-            let totalRequired = 0;
+            // 更新中表示
+            showMessage('morningRequirementsMessage', 'success', '更新中...');
             
-            document.querySelectorAll('#globalDefaultRequirements input[data-task]').forEach(input => {
-                const count = parseInt(input.value) || 0;
-                requirements[input.dataset.task] = count;
-                totalRequired += count;
+            const morningRequirements = {};
+            const morningTimes = {};
+            
+            // 人数を取得
+            document.querySelectorAll('#morningRequirements input[type="number"][data-task]').forEach(input => {
+                morningRequirements[input.dataset.task] = parseInt(input.value) || 0;
+            });
+            
+            // 作業時間を取得
+            document.querySelectorAll('#morningRequirements input[type="time"]').forEach(input => {
+                const taskType = input.dataset.task;
+                const field = input.dataset.field;
+                
+                if (!morningTimes[taskType]) {
+                    morningTimes[taskType] = {};
+                }
+                morningTimes[taskType][field] = input.value;
             });
 
-            // 従業員総数を取得してチェック
-            let totalEmployees = 0;
             try {
-                const employeesResponse = await fetch(`${API_BASE}/employees`);
-                const employees = await employeesResponse.json();
-                totalEmployees = employees.length;
-                
-                if (totalRequired > totalEmployees) {
-                    showMessage('globalDefaultMessage', 'error', `⚠️ 総従業員数を超過しています。`);
-                    setButtonLoading(button, false);
-                    return;
-                }
-            } catch (error) {
-                console.error('従業員数取得エラー:', error);
-                showMessage('globalDefaultMessage', 'error', '従業員数の取得に失敗しました');
-                setButtonLoading(button, false);
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/requirements/global-default`, {
+                // 人数設定を保存
+                await fetch(`${API_BASE}/requirements/morning-default`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requirements)
+                    body: JSON.stringify(morningRequirements)
                 });
                 
-                if (response.ok) {
-                    showMessage('globalDefaultMessage', 'success', '✓ デフォルト人数を保存しました');
-                    // メッセージを3秒後に消去してバリデーションメッセージを再表示
-                    setTimeout(() => {
-                        document.getElementById('globalDefaultMessage').innerHTML = '';
-                        validateTotalRequirements();
-                    }, 3000);
-                } else {
-                    throw new Error('保存に失敗しました');
-                }
+                // 各作業種別の作業時間を更新
+                const updatePromises = Object.entries(morningTimes).map(([taskType, times]) => {
+                    return fetch(`${API_BASE}/tasks/${taskType}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            morning_start_time: times.morning_start || '',
+                            morning_end_time: times.morning_end || ''
+                        })
+                    });
+                });
+                
+                await Promise.all(updatePromises);
+                
+                showMessage('morningRequirementsMessage', 'success', '✓ 午前シフト人数設定を更新しました');
+                setTimeout(() => {
+                    document.getElementById('morningRequirementsMessage').innerHTML = '';
+                    validateTotalRequirements();
+                }, 3000);
             } catch (error) {
-                showMessage('globalDefaultMessage', 'error', `エラー: ${error.message}`);
+                showMessage('morningRequirementsMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                setButtonLoading(button, false);
+            }
+        }
+
+        // 午後シフト人数設定保存
+        async function saveAfternoonRequirements() {
+            const button = event.target;
+            setButtonLoading(button, true);
+            
+            // 更新中表示
+            showMessage('afternoonRequirementsMessage', 'success', '更新中...');
+            
+            const afternoonRequirements = {};
+            const afternoonTimes = {};
+            
+            // 人数を取得
+            document.querySelectorAll('#afternoonRequirements input[type="number"][data-task]').forEach(input => {
+                afternoonRequirements[input.dataset.task] = parseInt(input.value) || 0;
+            });
+            
+            // 作業時間を取得
+            document.querySelectorAll('#afternoonRequirements input[type="time"]').forEach(input => {
+                const taskType = input.dataset.task;
+                const field = input.dataset.field;
+                
+                if (!afternoonTimes[taskType]) {
+                    afternoonTimes[taskType] = {};
+                }
+                afternoonTimes[taskType][field] = input.value;
+            });
+
+            try {
+                // 人数設定を保存
+                await fetch(`${API_BASE}/requirements/afternoon-default`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(afternoonRequirements)
+                });
+                
+                // 各作業種別の作業時間を更新
+                const updatePromises = Object.entries(afternoonTimes).map(([taskType, times]) => {
+                    return fetch(`${API_BASE}/tasks/${taskType}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            afternoon_start_time: times.afternoon_start || '',
+                            afternoon_end_time: times.afternoon_end || ''
+                        })
+                    });
+                });
+                
+                await Promise.all(updatePromises);
+                
+                showMessage('afternoonRequirementsMessage', 'success', '✓ 午後シフト人数設定を更新しました');
+                setTimeout(() => {
+                    document.getElementById('afternoonRequirementsMessage').innerHTML = '';
+                    validateTotalRequirements();
+                }, 3000);
+            } catch (error) {
+                showMessage('afternoonRequirementsMessage', 'error', `エラー: ${error.message}`);
             } finally {
                 setButtonLoading(button, false);
             }
@@ -628,7 +861,9 @@
         async function saveConfirmationSettings() {
             const button = event.target;
             setButtonLoading(button, true);
-            showMessage('confirmationMessage', 'error', '処理中...');
+            
+            // 更新中表示
+            showMessage('confirmationMessage', 'success', '更新中...');
             
             const day = parseInt(document.getElementById('confirmationDay').value);
             
@@ -650,7 +885,7 @@
                 });
                 
                 if (response.ok) {
-                    showMessage('confirmationMessage', 'success', '✓ シフト確定日を設定しました');
+                    showMessage('confirmationMessage', 'success', '✓ シフト確定日を更新しました');
                     // メッセージを3秒後に消去
                     setTimeout(() => {
                         document.getElementById('confirmationMessage').innerHTML = '';
@@ -697,6 +932,3 @@
             showMessage('success', 'デフォルト作業種別を追加しました');
             loadTasks();
         }
-    </script>
-</body>
-</html>

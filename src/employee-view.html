@@ -438,7 +438,13 @@
                 calendar.appendChild(dayDiv);
             }
 
-            if (statusEl) statusEl.textContent = '';
+            if (statusEl) {
+                if (selectedEmployeeId && shifts.length === 0 && vacations.length === 0) {
+                    statusEl.textContent = '出勤予定はありません。';
+                } else {
+                    statusEl.textContent = '';
+                }
+            }
         }
 
         // 月変更

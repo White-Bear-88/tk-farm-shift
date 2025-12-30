@@ -268,6 +268,7 @@ def save_confirmation_settings(event):
         }
 
 def get_vacation_default():
+    """休暇デフォルト設定を取得"""
     try:
         response = table.get_item(
             Key={'PK': 'SETTINGS', 'SK': 'VACATION_DEFAULT'}
@@ -277,35 +278,46 @@ def get_vacation_default():
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
                 'body': json.dumps({
-                    'default_vacation_days': response['Item'].get('default_vacation_days', 20)
+                    'default_vacation_days': int(response['Item'].get('default_vacation_days', 20))
                 })
             }
         else:
+            # デフォルト値を返す
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
                 'body': json.dumps({'default_vacation_days': 20})
             }
     except Exception as e:
+        print(f"Error in get_vacation_default: {str(e)}")
+        # エラーが発生してもデフォルト値を返す（500エラーを避ける）
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'default_vacation_days': 20})
+        }
+
+def save_vacation_default(event):
+    """休暇デフォルト設定を保存"""
+    try:
+        data = json.loads(event['body'])
+        
+        item = {
+            'PK': 'SETTINGS',
+            'SK': 'VACATION_DEFAULT',
+            'default_vacation_days': int(data['default_vacation_days'])
+        }
+        
+        table.put_item(Item=item)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'message': 'Vacation default settings saved'})
+        }
+    except Exception as e:
         return {
             'statusCode': 500,
             'headers': {'Content-Type': 'application/json'},
             'body': json.dumps({'error': str(e)})
         }
-
-def save_vacation_default(event):
-    data = json.loads(event['body'])
-    
-    item = {
-        'PK': 'SETTINGS',
-        'SK': 'VACATION_DEFAULT',
-        'default_vacation_days': data['default_vacation_days']
-    }
-    
-    table.put_item(Item=item)
-    
-    return {
-        'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
-        'body': json.dumps({'message': 'Vacation default settings saved'})
-    }

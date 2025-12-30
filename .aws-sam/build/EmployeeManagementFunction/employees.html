@@ -27,22 +27,17 @@
             align-items: center;
         }
         .back-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #007bff;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
+            padding: 10px 20px;
+            border-radius: 5px;
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
-            font-weight: 600;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
         }
         .back-btn:hover {
-            background: linear-gradient(135deg, #5568d3 0%, #63408a 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+            background: #0056b3;
         }
         .section {
             background: white;
@@ -144,6 +139,38 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            line-height: 20px;
+            cursor: pointer;
+        }
+        .close:hover,
+        .close:focus {
+            color: #000;
+        }
     </style>
 </head>
 <body>
@@ -165,62 +192,90 @@
         </div>
 
         <div class="section">
-            <h2>従業員登録・編集</h2>
-            <form id="employeeForm">
-                <input type="hidden" id="employeeId">
-                <input type="hidden" id="empId">
-                <div class="form-group">
-                    <label>氏名:</label>
-                    <input type="text" id="empName" placeholder="例: 田中太郎" required>
-                </div>
-                <div class="form-group">
-                    <label>電話番号:</label>
-                    <input type="tel" id="empPhone" placeholder="例: 090-1234-5678">
-                </div>
-                <div class="form-group">
-                    <label>メールアドレス:</label>
-                    <input type="email" id="empEmail" placeholder="例: tanaka@example.com">
-                </div>
-                <div class="form-group">
-                    <label>年間有給休暇日数:</label>
-                    <input type="number" id="empVacationDays" min="0" placeholder="20">
-                    <span>日</span>
-                </div>
-                <div class="form-group">
-                    <label>対応可能な作業:</label>
-                    <div class="checkbox-group">
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="skill-milking" value="milking">
-                            <label for="skill-milking">搾乳</label>
-                        </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="skill-feeding" value="feeding">
-                            <label for="skill-feeding">給餌</label>
-                        </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="skill-cleaning" value="cleaning">
-                            <label for="skill-cleaning">清掃</label>
-                        </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="skill-patrol" value="patrol">
-                            <label for="skill-patrol">見回り</label>
-                        </div>
-                    </div>
-                </div>
-                <button type="submit" id="submitBtn">登録</button>
-                <button type="button" onclick="resetForm()">リセット</button>
-            </form>
-            <div id="formMessage"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>従業員一覧</h2>
+                <button onclick="openEmployeeModal()">追加</button>
+            </div>
+            <div id="employeeList" class="employee-list"></div>
         </div>
 
-        <div class="section">
-            <h2>従業員一覧</h2>
-            <div id="employeeList" class="employee-list"></div>
+        <!-- 従業員登録・編集モーダル -->
+        <div id="employeeModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeEmployeeModal()">&times;</span>
+                <h2 id="modalTitle">従業員登録・編集</h2>
+                <form id="employeeForm">
+                    <input type="hidden" id="employeeId">
+                    <input type="hidden" id="empId">
+                    <div class="form-group">
+                        <label>氏名:</label>
+                        <input type="text" id="empName" placeholder="例: 田中太郎" required>
+                    </div>
+                    <div class="form-group">
+                        <label>電話番号:</label>
+                        <input type="tel" id="empPhone" placeholder="例: 090-1234-5678">
+                    </div>
+                    <div class="form-group">
+                        <label>メールアドレス:</label>
+                        <input type="email" id="empEmail" placeholder="例: tanaka@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>年間有給休暇日数:</label>
+                        <input type="number" id="empVacationDays" min="0" placeholder="20">
+                        <span>日</span>
+                    </div>
+                    <div class="form-group">
+                        <label>対応可能な作業:</label>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="skill-milking" value="milking">
+                                <label for="skill-milking">搾乳</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="skill-feeding" value="feeding">
+                                <label for="skill-feeding">給餌</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="skill-cleaning" value="cleaning">
+                                <label for="skill-cleaning">清掃</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="skill-patrol" value="patrol">
+                                <label for="skill-patrol">見回り</label>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" id="submitBtn">登録</button>
+                    <button type="button" onclick="resetForm()">リセット</button>
+                </form>
+                <div id="formMessage"></div>
+            </div>
         </div>
     </div>
 
     <script>
         const API_BASE = 'https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev';
+
+        // モーダルの開閉
+        function openEmployeeModal() {
+            resetForm();
+            document.getElementById('modalTitle').textContent = '従業員登録';
+            document.getElementById('submitBtn').textContent = '登録';
+            document.getElementById('employeeModal').style.display = 'block';
+        }
+
+        function closeEmployeeModal() {
+            document.getElementById('employeeModal').style.display = 'none';
+            resetForm();
+        }
+
+        // モーダル外をクリックで閉じる
+        window.onclick = function(event) {
+            const modal = document.getElementById('employeeModal');
+            if (event.target == modal) {
+                closeEmployeeModal();
+            }
+        }
 
         // ボタンの処理中状態を管理
         function setButtonLoading(button, loading) {
@@ -293,8 +348,10 @@
                 if (response.ok) {
                     const result = await response.json();
                     showMessage('formMessage', 'success', isEdit ? '✓ 従業員情報を更新しました。' : '✓ 従業員を登録しました。');
-                    resetForm();
-                    loadEmployees();
+                    setTimeout(() => {
+                        closeEmployeeModal();
+                        loadEmployees();
+                    }, 1500);
                 } else {
                     throw new Error('操作に失敗しました');
                 }
@@ -356,8 +413,9 @@
                         cb.checked = emp.skills && emp.skills.includes(cb.value);
                     });
                     
+                    document.getElementById('modalTitle').textContent = '従業員編集';
                     document.getElementById('submitBtn').textContent = '更新';
-                    window.scrollTo(0, 0);
+                    document.getElementById('employeeModal').style.display = 'block';
                 })
                 .catch(error => showMessage('formMessage', 'error', `エラー: ${error.message}`));
         }

@@ -199,7 +199,7 @@
                 <select id="employeeSelect" onchange="switchEmployee()">
                     <option value="">従業員を選択</option>
                 </select>
-                <a href="menu.html" style="margin-left: 15px; text-decoration: none; color: #666;">← メニューに戻る</a>
+                <a href="menu.html" style="margin-left: 15px; text-decoration: none; color: white; background: #007bff; padding: 10px 20px; border-radius: 5px; display: inline-block;">← メニューに戻る</a>
             </div>
         </div>
 
@@ -438,7 +438,13 @@
                 calendar.appendChild(dayDiv);
             }
 
-            if (statusEl) statusEl.textContent = '';
+            if (statusEl) {
+                if (selectedEmployeeId && shifts.length === 0 && vacations.length === 0) {
+                    statusEl.textContent = '出勤予定はありません。';
+                } else {
+                    statusEl.textContent = '';
+                }
+            }
         }
 
         // 月変更

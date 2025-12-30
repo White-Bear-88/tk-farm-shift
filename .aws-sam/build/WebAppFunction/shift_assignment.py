@@ -46,12 +46,27 @@ def generate_monthly_shifts(event):
     """
     try:
         data = json.loads(event['body'])
-        month = data['month']  # "2024-12" format
+        month = data.get('month')
+        if not month:
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': '月が指定されていません'})
+            }
+            
         overwrite = data.get('overwrite', True)  # デフォルトで上書き
         preview = data.get('preview', False)
 
         # Prevent generation for past months (relative to current year-month)
-        year, month_num = map(int, month.split('-'))
+        try:
+            year, month_num = map(int, month.split('-'))
+        except (ValueError, AttributeError) as e:
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': f'不正な月フォーマット: {month}'})
+            }
+            
         from datetime import datetime as _dt
         now = _dt.now()
         if (year, month_num) < (now.year, now.month):
@@ -75,6 +90,13 @@ def generate_monthly_shifts(event):
         # 従業員リストを取得
         employees = get_available_employees()
         
+        if not employees:
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': '従業員が登録されていません'})
+            }
+        
         for day in range(1, days_in_month + 1):
             date = f"{month}-{day:02d}"
             
@@ -86,8 +108,13 @@ def generate_monthly_shifts(event):
                 day_requirements = requirements
             
             # その日のシフトを生成
-            day_shifts = generate_day_shifts(date, day_requirements, employees, not preview)
-            generated_shifts.extend(day_shifts)
+            try:
+                day_shifts = generate_day_shifts(date, day_requirements, employees, not preview)
+                generated_shifts.extend(day_shifts)
+            except Exception as e:
+                print(f"Error generating shifts for {date}: {str(e)}")
+                # Continue with next day instead of failing completely
+                continue
         
         return {
             'statusCode': 200,
@@ -219,30 +246,42 @@ def generate_day_shifts(date, requirements, employees, overwrite=True):
         'patrol': [('14:00', '14:30')]
     }
     
+    if not requirements:
+        return shifts
+    
     for task_type, count in requirements.items():
         if count <= 0:
             continue
-            
-        # スキルを持つ従業員をフィルタ
-        skilled_employees = [emp for emp in employees if task_type in emp.get('skills', [])]
         
-        # 必要人数分割り当て
-        for i in range(min(count, len(skilled_employees))):
-            employee = skilled_employees[i]
-            times = task_schedules.get(task_type, [('09:00', '17:00')])
-            start_time, end_time = times[0]
+        try:
+            # スキルを持つ従業員をフィルタ
+            skilled_employees = [emp for emp in employees if task_type in emp.get('skills', [])]
             
-            shift = {
-                'date': date,
-                'employee_id': employee['id'],
-                'task_type': task_type,
-                'start_time': start_time,
-                'end_time': end_time
-            }
-            
-            # 冪等性を保つための保存
-            if save_shift_assignment_safe(shift, overwrite):
-                shifts.append(shift)
+            # 必要人数分割り当て
+            for i in range(min(count, len(skilled_employees))):
+                employee = skilled_employees[i]
+                times = task_schedules.get(task_type, [('09:00', '17:00')])
+                start_time, end_time = times[0]
+                
+                shift = {
+                    'date': date,
+                    'employee_id': employee['id'],
+                    'task_type': task_type,
+                    'start_time': start_time,
+                    'end_time': end_time
+                }
+                
+                # 冪等性を保つための保存
+                if overwrite:
+                    if save_shift_assignment_safe(shift, True):
+                        shifts.append(shift)
+                else:
+                    # プレビューモードの場合は保存せずに返す
+                    shifts.append(shift)
+        except Exception as e:
+            print(f"Error assigning {task_type} on {date}: {str(e)}")
+            # Continue with next task type
+            continue
     
     return shifts
 
@@ -330,21 +369,26 @@ def assign_shifts(event):
 
 def get_available_employees():
     """利用可能な従業員リストを取得"""
-    response = table.query(
-        KeyConditionExpression='PK = :pk',
-        ExpressionAttributeValues={':pk': 'EMPLOYEE'}
-    )
-    
-    employees = []
-    for item in response['Items']:
-        employees.append({
-            'id': item['SK'],
-            'name': item.get('name', ''),
-            'skills': item.get('skills', []),
-            'max_hours_per_day': item.get('max_hours_per_day', 8)
-        })
-    
-    return employees
+    try:
+        response = table.query(
+            KeyConditionExpression='PK = :pk',
+            ExpressionAttributeValues={':pk': 'EMPLOYEE'}
+        )
+        
+        employees = []
+        for item in response['Items']:
+            employees.append({
+                'id': item['SK'],
+                'name': item.get('name', ''),
+                'skills': item.get('skills', []),
+                'max_hours_per_day': item.get('max_hours_per_day', 8)
+            })
+        
+        return employees
+    except Exception as e:
+        print(f"Error getting employees: {str(e)}")
+        # Return empty list instead of raising to avoid 500 error
+        return []
 
 def get_existing_shifts(date):
     """既存のシフトを取得"""
