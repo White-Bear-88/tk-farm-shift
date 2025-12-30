@@ -382,11 +382,19 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>開始時間:</label>
-                            <input type="time" id="morningStartTime" step="900">
+                            <div style="display: flex; gap: 3px; align-items: center;">
+                                <select id="morningStartHour" style="width: 60px;"></select>
+                                <span>:</span>
+                                <select id="morningStartMinute" style="width: 60px;"></select>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>終了時間:</label>
-                            <input type="time" id="morningEndTime" step="900">
+                            <div style="display: flex; gap: 3px; align-items: center;">
+                                <select id="morningEndHour" style="width: 60px;"></select>
+                                <span>:</span>
+                                <select id="morningEndMinute" style="width: 60px;"></select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -403,11 +411,19 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>開始時間:</label>
-                            <input type="time" id="afternoonStartTime" step="900">
+                            <div style="display: flex; gap: 3px; align-items: center;">
+                                <select id="afternoonStartHour" style="width: 60px;"></select>
+                                <span>:</span>
+                                <select id="afternoonStartMinute" style="width: 60px;"></select>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>終了時間:</label>
-                            <input type="time" id="afternoonEndTime" step="900">
+                            <div style="display: flex; gap: 3px; align-items: center;">
+                                <select id="afternoonEndHour" style="width: 60px;"></select>
+                                <span>:</span>
+                                <select id="afternoonEndMinute" style="width: 60px;"></select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -424,8 +440,10 @@
                     <select id="taskSelect">
                         <option value="">作業を選択</option>
                     </select>
-                    <input type="time" id="startTime" step="900">
-                    <input type="time" id="endTime" step="900">
+                    <select id="startHour"></select>
+                    <select id="startMinute"></select>
+                    <select id="endHour"></select>
+                    <select id="endMinute"></select>
                 </div>
                 
                 <input type="hidden" id="shiftStatus" value="active">
@@ -448,16 +466,80 @@
         let previewMonth = null;
         let previewShifts = [];
 
+        // 時間の選択肢を生成（00〜23）
+        function generateHourOptions() {
+            const options = [];
+            for (let h = 0; h < 24; h++) {
+                options.push(String(h).padStart(2, '0'));
+            }
+            return options;
+        }
+
+        // 分の選択肢を生成（15分刻み）
+        function generateMinuteOptions() {
+            return ['00', '10', '20', '30', '40', '50'];
+        }
+
+        // selectタグに時間オプションを追加
+        function populateHourSelect(selectElement, selectedValue = '') {
+            const options = generateHourOptions();
+            selectElement.innerHTML = '<option value="">--</option>';
+            options.forEach(hour => {
+                const option = document.createElement('option');
+                option.value = hour;
+                option.textContent = hour;
+                if (hour === selectedValue) {
+                    option.selected = true;
+                }
+                selectElement.appendChild(option);
+            });
+        }
+
+        // selectタグに分オプションを追加
+        function populateMinuteSelect(selectElement, selectedValue = '') {
+            const options = generateMinuteOptions();
+            selectElement.innerHTML = '<option value="">--</option>';
+            options.forEach(minute => {
+                const option = document.createElement('option');
+                option.value = minute;
+                option.textContent = minute;
+                if (minute === selectedValue) {
+                    option.selected = true;
+                }
+                selectElement.appendChild(option);
+            });
+        }
+
+        // 時間文字列（HH:MM）から時と分を分離してselectに設定
+        function setTimeSelects(hourSelectId, minuteSelectId, timeValue) {
+            if (timeValue && timeValue.includes(':')) {
+                const [hour, minute] = timeValue.split(':');
+                populateHourSelect(document.getElementById(hourSelectId), hour);
+                populateMinuteSelect(document.getElementById(minuteSelectId), minute);
+            } else {
+                populateHourSelect(document.getElementById(hourSelectId), '');
+                populateMinuteSelect(document.getElementById(minuteSelectId), '');
+            }
+        }
+
+        // 時と分のselectから時間文字列（HH:MM）を取得
+        function getTimeFromSelects(hourSelectId, minuteSelectId) {
+            const hour = document.getElementById(hourSelectId).value;
+            const minute = document.getElementById(minuteSelectId).value;
+            if (hour && minute) {
+                return `${hour}:${minute}`;
+            }
+            return '';
+        }
+
         // ボタンの処理中状態を管理
         function setButtonLoading(button, loading) {
             if (loading) {
                 button.disabled = true;
                 button.style.opacity = '0.6';
-                button.style.cursor = 'not-allowed';
             } else {
                 button.disabled = false;
                 button.style.opacity = '1';
-                button.style.cursor = 'pointer';
             }
         }
 
@@ -465,6 +547,14 @@
         document.addEventListener('DOMContentLoaded', async () => {
             // suppressModalOnLoad を初期化して、ナビ遷移時の不意なモーダル表示を防ぐ
             window.suppressModalOnLoad = true;
+
+            // 時刻selectを初期化
+            setTimeSelects('morningStartHour', 'morningStartMinute', '');
+            setTimeSelects('morningEndHour', 'morningEndMinute', '');
+            setTimeSelects('afternoonStartHour', 'afternoonStartMinute', '');
+            setTimeSelects('afternoonEndHour', 'afternoonEndMinute', '');
+            setTimeSelects('startHour', 'startMinute', '');
+            setTimeSelects('endHour', 'endMinute', '');
 
             // 現在の月を先に設定してカレンダーを表示
             setCurrentMonth();
@@ -692,21 +782,30 @@
             console.log('シフト自動生成ボタンがクリックされました');
             
             const button = event?.target || document.getElementById('generateMonthBtn2');
-            if (button) setButtonLoading(button, true);
-            showMessage('generateMessage', 'success', '処理中...');
+            const originalText = button?.textContent;
+            if (button) {
+                button.textContent = '🔄 処理中...';
+                setButtonLoading(button, true);
+            }
             
             const monthValue = document.getElementById('calendarMonth').value;
             console.log('選択された月:', monthValue);
             
             if (!monthValue) {
                 showMessage('generateMessage', 'error', '月を選択してください');
-                if (button) setButtonLoading(button, false);
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
                 return;
             }
             if (isMonthInPast(monthValue)) {
                 console.log('過去の月が選択されています:', monthValue);
                 showMessage('generateMessage', 'error', '表示月が過去のため、自動シフト生成できません');
-                if (button) setButtonLoading(button, false);
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
                 return;
             }
             const requirements = await getCurrentDefaultRequirements();
@@ -829,8 +928,11 @@
         async function commitPreview(event) {
             if (!previewMonth) return;
             const button = event?.target || document.getElementById('commitPreviewBtn');
-            if (button) setButtonLoading(button, true);
-            showMessage('generateMessage', 'success', '処理中...');
+            const originalText = button?.textContent;
+            if (button) {
+                button.textContent = '🔄 登録中...';
+                setButtonLoading(button, true);
+            }
             
             const monthValue = previewMonth;
             setProcessing(true, '登録中...');
@@ -840,7 +942,10 @@
                     const ok = confirm(`${monthValue}には既に${existingShifts}件のシフトがあります。登録すると既存のシフトが削除されますが、よろしいですか？`);
                     if (!ok) {
                         setProcessing(false);
-                        if (button) setButtonLoading(button, false);
+                        if (button) {
+                            button.textContent = originalText;
+                            setButtonLoading(button, false);
+                        }
                         return;
                     }
                 }
@@ -1258,8 +1363,9 @@
                 document.getElementById('taskSelect').value = shift.task_type;
             }, 0);
 
-            document.getElementById('startTime').value = shift.start_time || '';
-            document.getElementById('endTime').value = shift.end_time || '';
+            // selectに値を設定
+            setTimeSelects('startHour', 'startMinute', shift.start_time || '');
+            setTimeSelects('endHour', 'endMinute', shift.end_time || '');
 
             // Clear modal message
             document.getElementById('modalMessage').innerHTML = '';
@@ -1273,8 +1379,15 @@
             refreshEmployeeSelectForDate(date, null);
             document.getElementById('taskSelect').innerHTML = '<option value="">作業を選択</option>';
             document.getElementById('employeeSelect').value = '';
-            document.getElementById('startTime').value = '';
-            document.getElementById('endTime').value = '';
+            
+            // selectを空に戻す
+            setTimeSelects('startHour', 'startMinute', '');
+            setTimeSelects('endHour', 'endMinute', '');
+            setTimeSelects('morningStartHour', 'morningStartMinute', '');
+            setTimeSelects('morningEndHour', 'morningEndMinute', '');
+            setTimeSelects('afternoonStartHour', 'afternoonStartMinute', '');
+            setTimeSelects('afternoonEndHour', 'afternoonEndMinute', '');
+            
             document.getElementById('modalMessage').innerHTML = '';
             // Uncheck all checkboxes
             document.querySelectorAll('.shift-checkbox').forEach(cb => cb.checked = false);
@@ -1364,8 +1477,11 @@
             if (!confirm('登録データを削除しますか？')) return;
 
             const button = event?.target || document.getElementById('deleteBtn');
-            if (button) setButtonLoading(button, true);
-            showMessage('modalMessage', 'error', '処理中...');
+            const originalText = button?.textContent;
+            if (button) {
+                button.textContent = '🔄 削除中...';
+                setButtonLoading(button, true);
+            }
             setProcessing(true, '削除中...');
             try {
                 const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
@@ -1383,7 +1499,10 @@
                 showMessage('modalMessage', 'error', `エラー: ${error.message}`);
             } finally {
                 setProcessing(false);
-                if (button) setButtonLoading(button, false);
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
             }
         }
 
