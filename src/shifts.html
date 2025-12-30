@@ -692,21 +692,30 @@
             console.log('シフト自動生成ボタンがクリックされました');
             
             const button = event?.target || document.getElementById('generateMonthBtn2');
-            if (button) setButtonLoading(button, true);
-            showMessage('generateMessage', 'success', '処理中...');
+            const originalText = button?.textContent;
+            if (button) {
+                button.textContent = '🔄 処理中...';
+                setButtonLoading(button, true);
+            }
             
             const monthValue = document.getElementById('calendarMonth').value;
             console.log('選択された月:', monthValue);
             
             if (!monthValue) {
                 showMessage('generateMessage', 'error', '月を選択してください');
-                if (button) setButtonLoading(button, false);
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
                 return;
             }
             if (isMonthInPast(monthValue)) {
                 console.log('過去の月が選択されています:', monthValue);
                 showMessage('generateMessage', 'error', '表示月が過去のため、自動シフト生成できません');
-                if (button) setButtonLoading(button, false);
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
                 return;
             }
             const requirements = await getCurrentDefaultRequirements();
@@ -829,8 +838,11 @@
         async function commitPreview(event) {
             if (!previewMonth) return;
             const button = event?.target || document.getElementById('commitPreviewBtn');
-            if (button) setButtonLoading(button, true);
-            showMessage('generateMessage', 'success', '処理中...');
+            const originalText = button?.textContent;
+            if (button) {
+                button.textContent = '🔄 登録中...';
+                setButtonLoading(button, true);
+            }
             
             const monthValue = previewMonth;
             setProcessing(true, '登録中...');
@@ -840,7 +852,10 @@
                     const ok = confirm(`${monthValue}には既に${existingShifts}件のシフトがあります。登録すると既存のシフトが削除されますが、よろしいですか？`);
                     if (!ok) {
                         setProcessing(false);
-                        if (button) setButtonLoading(button, false);
+                        if (button) {
+                            button.textContent = originalText;
+                            setButtonLoading(button, false);
+                        }
                         return;
                     }
                 }
@@ -1364,8 +1379,11 @@
             if (!confirm('登録データを削除しますか？')) return;
 
             const button = event?.target || document.getElementById('deleteBtn');
-            if (button) setButtonLoading(button, true);
-            showMessage('modalMessage', 'error', '処理中...');
+            const originalText = button?.textContent;
+            if (button) {
+                button.textContent = '🔄 削除中...';
+                setButtonLoading(button, true);
+            }
             setProcessing(true, '削除中...');
             try {
                 const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
@@ -1383,7 +1401,10 @@
                 showMessage('modalMessage', 'error', `エラー: ${error.message}`);
             } finally {
                 setProcessing(false);
-                if (button) setButtonLoading(button, false);
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
             }
         }
 

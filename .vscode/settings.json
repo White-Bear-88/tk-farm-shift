@@ -2,5 +2,6 @@
     "aws.telemetry": false,
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "python-envs.pythonProjects": [],
-    "amazonQ.telemetry": false
+    "amazonQ.telemetry": false,
+    "git.ignoreLimitWarning": true
 }

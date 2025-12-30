@@ -193,7 +193,7 @@
 
         <div class="section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>従業員一覧</h2>
+                <h2>従業員一覧 <span id="employeeCount" style="font-size: 0.9em; color: #666;"></span></h2>
                 <button onclick="openEmployeeModal()">追加</button>
             </div>
             <div id="employeeList" class="employee-list"></div>
@@ -221,7 +221,7 @@
                     </div>
                     <div class="form-group">
                         <label>年間有給休暇日数:</label>
-                        <input type="number" id="empVacationDays" min="0" placeholder="20">
+                        <input type="number" id="empVacationDays" min="0" placeholder="20" style="width: 100px;">
                         <span>日</span>
                     </div>
                     <div class="form-group">
@@ -295,8 +295,10 @@
             e.preventDefault();
             
             const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.textContent;
+            const isEdit = document.getElementById('employeeId').value;
+            submitBtn.textContent = isEdit ? '🔄 更新中...' : '🔄 登録中...';
             setButtonLoading(submitBtn, true);
-            showMessage('formMessage', 'error', '処理中...');
             
             const skills = [];
             document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
@@ -320,7 +322,6 @@
             }
 
             const employeeId = document.getElementById('empId').value;
-            const isEdit = document.getElementById('employeeId').value;
             
             const data = {
                 name: document.getElementById('empName').value,
@@ -358,6 +359,7 @@
             } catch (error) {
                 showMessage('formMessage', 'error', `エラー: ${error.message}`);
             } finally {
+                submitBtn.textContent = originalText;
                 setButtonLoading(submitBtn, false);
             }
         });
@@ -367,6 +369,10 @@
             try {
                 const response = await fetch(`${API_BASE}/employees`);
                 const employees = await response.json();
+                
+                // 総人数を表示
+                const countSpan = document.getElementById('employeeCount');
+                countSpan.textContent = `（総人数: ${employees.length}人）`;
                 
                 const listDiv = document.getElementById('employeeList');
                 if (employees.length === 0) {
@@ -425,8 +431,9 @@
             if (!confirm('この従業員を削除しますか？')) return;
 
             const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '🔄 削除中...';
             setButtonLoading(button, true);
-            showMessage('formMessage', 'error', '処理中...');
 
             try {
                 const response = await fetch(`${API_BASE}/employees/${employeeId}`, {
@@ -435,13 +442,14 @@
                 
                 if (response.ok) {
                     showMessage('formMessage', 'success', '✓ 従業員を削除しました。');
-                    loadEmployees();
+                    await loadEmployees();
                 } else {
                     throw new Error('削除に失敗しました');
                 }
             } catch (error) {
                 showMessage('formMessage', 'error', `エラー: ${error.message}`);
             } finally {
+                button.textContent = originalText;
                 setButtonLoading(button, false);
             }
         }
@@ -481,8 +489,11 @@
             }
 
             const button = event.target;
+            const originalText = button.textContent;
+            
+            // スピナー表示
+            button.textContent = '🔄 更新中...';
             setButtonLoading(button, true);
-            showMessage('vacationDefaultMessage', 'error', '処理中...');
 
             try {
                 const response = await fetch(`${API_BASE}/settings/vacation-default`, {
@@ -499,6 +510,7 @@
             } catch (error) {
                 showMessage('vacationDefaultMessage', 'error', `エラー: ${error.message}`);
             } finally {
+                button.textContent = originalText;
                 setButtonLoading(button, false);
             }
         }

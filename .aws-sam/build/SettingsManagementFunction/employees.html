@@ -481,8 +481,11 @@
             }
 
             const button = event.target;
+            
+            // 更新中表示（ボタンを無効化する前にメッセージを表示）
+            showMessage('vacationDefaultMessage', 'success', '更新中...');
+            
             setButtonLoading(button, true);
-            showMessage('vacationDefaultMessage', 'error', '処理中...');
 
             try {
                 const response = await fetch(`${API_BASE}/settings/vacation-default`, {
