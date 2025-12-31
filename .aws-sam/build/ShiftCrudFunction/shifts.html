@@ -143,6 +143,14 @@
             border-left: 3px solid #28a745;
             font-size: 12px;
         }
+        .shift-item.morning {
+            background: #e8f5e9;
+            border-left: 3px solid #28a745;
+        }
+        .shift-item.afternoon {
+            background: #fff3e0;
+            border-left: 3px solid #ff8c00;
+        }
         .calendar-controls {
             display: flex;
             justify-content: space-between;
@@ -194,10 +202,15 @@
             margin: 1px 0;
             display: block;
         }
+        .shift-assignment.morning {
+            background: #4caf50;
+        }
+        .shift-assignment.afternoon {
+            background: #ff9800;
+        }
         .shift-assignment.preview {
-            background: #90caf9;
-            opacity: 0.9;
-            border-left-style: dashed;
+            opacity: 0.8;
+            border: 1px dashed #333;
         }
         .shift-assignment.vacation-conflict {
             background: #ff5722;
@@ -268,20 +281,38 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
-        /* Spinner */
-        .spinner {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 2px solid rgba(0,0,0,0.15);
-            border-top-color: rgba(0,0,0,0.6);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            vertical-align: middle;
-            margin-right: 8px;
+        /* ローディングコンテナ */
+        .loading-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            text-align: center;
         }
+        .spinner-loader {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            margin-bottom: 20px;
+        }
+        .spinner {
+            width: 100%;
+            height: 100%;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-text {
+            font-size: 16px;
+            color: #666;
+            margin-top: 10px;
+        }
+        /* スピナーアニメーション */
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         /* チェックボックスのスタイリング */
         .shift-checkbox {
@@ -341,12 +372,18 @@
                 <div class="month-selector">
                     <label>表示月:</label>
                     <input type="month" id="calendarMonth" onchange="updateShiftCalendar()">
-                    <span id="calendarLoadingMessage" style="margin-left: 15px; color: #666; font-size: 14px;"></span>
                     <span id="pastMonthMessage" style="margin-left: 15px; color: #dc3545; font-size: 14px;"></span>
                 </div>
                 <div class="auto-generate">
-                    <button id="generateMonthBtn2" class="btn-success" onclick="generateMonthlyShifts(event)" title="選択した月のシフトを自動生成します">シフト自動生成</button>
+                    <button id="generateMorningBtn" class="btn-success" onclick="generateMonthlyShifts(event, 'morning')" title="選択した月の午前シフトを自動生成します">午前シフト自動生成</button>
+                    <button id="generateAfternoonBtn" class="btn-success" onclick="generateMonthlyShifts(event, 'afternoon')" title="選択した月の午後シフトを自動生成します" style="background: #ff8c00;">午後シフト自動生成</button>
                 </div>
+            </div>
+            <div id="calendarLoadingContainer" class="loading-container" style="display: none;">
+                <div class="spinner-loader">
+                    <div class="spinner"></div>
+                </div>
+                <div class="loading-text">カレンダーを読み込み中...</div>
             </div>
             <div class="shift-calendar" id="shiftCalendar"></div>
             <div id="calendarMessage"></div>
@@ -955,11 +992,12 @@
             // 月が変更されたら自動生成ボタンの状態を更新
             updateGenerateButtons();
             
-            // ローディング表示（表示月の横に）
-            const loadingMessage = document.getElementById('calendarLoadingMessage');
-            if (loadingMessage) loadingMessage.innerHTML = '<span class="spinner"></span>読み込み中...';
-            
+            // ローディング表示
+            const loadingContainer = document.getElementById('calendarLoadingContainer');
             const calendar = document.getElementById('shiftCalendar');
+            if (loadingContainer) loadingContainer.style.display = 'flex';
+            if (calendar) calendar.style.display = 'none';
+            
             const [year, month] = monthValue.split('-').map(Number);
             const firstDay = new Date(year, month - 1, 1);
             const startDate = new Date(firstDay);
@@ -1030,18 +1068,27 @@
                         const shiftsHtml = dayShifts.map(s => {
                             const conflictClass = s.vacation_conflict ? ' vacation-conflict' : '';
                             const previewClass = s._preview ? ' preview' : '';
+                            
+                            // 午前・午後の判定（start_timeが12:00より前なら午前、それ以外は午後）
+                            let shiftTypeClass = '';
+                            if (s.start_time) {
+                                const [hour] = s.start_time.split(':').map(Number);
+                                shiftTypeClass = hour < 12 ? ' morning' : ' afternoon';
+                            }
+                            
                             const empName = employeesMap[s.employee_id] || s.employee_id;
-                            return `<div class="shift-assignment${conflictClass}${previewClass}">${getTaskName(s.task_type)} — ${empName}${s._preview? ' (プレビュー)':''}</div>`;
+                            return `<div class="shift-assignment${conflictClass}${previewClass}${shiftTypeClass}">${getTaskName(s.task_type)} — ${empName}${s._preview? ' (プレビュー)':''}</div>`;
                         }).join('');
                         dayDiv.innerHTML += shiftsHtml;
                     }
                 });
             } catch (error) {
                 console.error('シフトデータ取得エラー:', error);
+            } finally {
+                // ローディング非表示、カレンダー表示
+                if (loadingContainer) loadingContainer.style.display = 'none';
+                if (calendar) calendar.style.display = 'grid';
             }
-            
-            // ローディングメッセージをクリア
-            if (loadingMessage) loadingMessage.innerHTML = '';
         }
 
         // シフトモーダルを開く（指定日のシフト一覧を読み込み）
@@ -1091,11 +1138,19 @@
         function updateGenerateButtons() {
             const monthValue = document.getElementById('calendarMonth').value;
             const disabled = isMonthInPast(monthValue);
-            const btn2 = document.getElementById('generateMonthBtn2');
-            if (btn2) {
-                btn2.disabled = disabled;
-                btn2.title = disabled ? '過去月のため自動生成できません' : '';
+            
+            const morningBtn = document.getElementById('generateMorningBtn');
+            if (morningBtn) {
+                morningBtn.disabled = disabled;
+                morningBtn.title = disabled ? '過去月のため自動生成できません' : '選択した月の午前シフトを自動生成します';
             }
+            
+            const afternoonBtn = document.getElementById('generateAfternoonBtn');
+            if (afternoonBtn) {
+                afternoonBtn.disabled = disabled;
+                afternoonBtn.title = disabled ? '過去月のため自動生成できません' : '選択した月の午後シフトを自動生成します';
+            }
+            
             const pastMonthMessage = document.getElementById('pastMonthMessage');
             if (pastMonthMessage) {
                 pastMonthMessage.textContent = disabled ? '過去日の編集はできません' : '';
@@ -1133,10 +1188,10 @@
         }
 
         // 月間シフト自動生成 (対象は常に表示月)。使用する必要人数は、UIに表示されているグローバルデフォルト値を利用する
-        async function generateMonthlyShifts(event) {
-            console.log('シフト自動生成ボタンがクリックされました');
+        async function generateMonthlyShifts(event, shiftType = 'both') {
+            console.log('シフト自動生成ボタンがクリックされました。shiftType:', shiftType);
             
-            const button = event?.target || document.getElementById('generateMonthBtn2');
+            const button = event?.target;
             const originalText = button?.textContent;
             if (button) {
                 button.textContent = '🔄 処理中...';
@@ -1172,7 +1227,13 @@
                 const previewRes = await fetch(`${API_BASE}/shifts/generate-monthly`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ month: monthValue, overwrite: false, preview: true, requirements })
+                    body: JSON.stringify({ 
+                        month: monthValue, 
+                        overwrite: false, 
+                        preview: true, 
+                        requirements,
+                        shift_type: shiftType  // 'morning', 'afternoon', or 'both'
+                    })
                 });
                 
                 console.log('APIレスポンスステータス:', previewRes.status);

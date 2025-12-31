@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>作業管理 - 酪農シフト管理システム</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <style>
@@ -62,6 +65,7 @@
             border-radius: 5px;
             font-size: 14px;
             text-align: center;
+            box-sizing: border-box;
         }
         textarea {
             height: 80px;
@@ -129,7 +133,7 @@
         }
         .requirement-item {
             display: grid;
-            grid-template-columns: 120px 50px 30px 30px 50px 20px 50px 30px 50px 20px 50px 1fr;
+            grid-template-columns: 120px 50px 80px 30px 60px 20px 60px 40px 60px 20px 60px 1fr;
             align-items: center;
             gap: 5px;
             margin: 10px 0;
@@ -209,8 +213,43 @@
             font-size: 20px;
             cursor: pointer;
         }
-        .modal input, .modal textarea {
-            text-align: left;
+        .modal input, .modal textarea, .modal select {
+            text-align: left !important;
+            width: calc(100% - 4px);
+            margin: 0 auto;
+        }
+        /* ローディングコンテナ */
+        .loading-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            text-align: center;
+        }
+        .spinner-loader {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            margin-bottom: 20px;
+        }
+        .spinner {
+            width: 100%;
+            height: 100%;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-text {
+            font-size: 16px;
+            color: #666;
+            margin-top: 10px;
+        }
+        /* スピナーアニメーション */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -697,9 +736,17 @@
 
         // Edit task
         function editTask(taskType) {
+            console.log('editTask called with taskType:', taskType);
             fetch(`${API_BASE}/tasks/${taskType}`)
-                .then(response => response.json())
+                .then(response => {
+                    console.log('API response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(task => {
+                    console.log('Received task data:', task);
                     document.getElementById('taskId').value = task.task_type;
                     document.getElementById('taskCode').value = task.task_type;
                     document.getElementById('taskName').value = task.name;
@@ -708,7 +755,10 @@
                     document.getElementById('submitBtn').textContent = '更新';
                     document.getElementById('taskModal').style.display = 'block';
                 })
-                .catch(error => showMessage('formMessage', 'error', `エラー: ${error.message}`));
+                .catch(error => {
+                    console.error('editTask error:', error);
+                    showMessage('formMessage', 'error', `エラー: ${error.message}`);
+                });
         }
 
         // Delete task
@@ -825,6 +875,21 @@
             try {
                 const tasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
                 
+                // 従業員情報を取得して、各作業種別の可能人数を計算
+                const employees = await fetch(`${API_BASE}/employees`).then(r => r.json());
+                const taskCapacity = {};
+                
+                tasks.forEach(task => {
+                    // この作業ができる従業員を数える
+                    const capableEmployees = employees.filter(emp => 
+                        emp.available_tasks && emp.available_tasks.includes(task.task_type)
+                    );
+                    taskCapacity[task.task_type] = capableEmployees.length;
+                });
+                
+                // taskCapacityをグローバル変数として保存
+                window.taskCapacity = taskCapacity;
+                
                 let defaults = {};
                 try {
                     const response = await fetch(`${API_BASE}/requirements/global-default`);
@@ -863,10 +928,11 @@
                 morningHTML += tasks.map((task, index) => `
                     <div class="requirement-item">
                         <label>${task.name}</label>
-                        <input type="number" min="0" value="${defaults[task.task_type] || task.required_people || 1}" 
+                        <input type="number" min="0" max="${taskCapacity[task.task_type] || 0}" 
+                               value="${defaults[task.task_type] || task.required_people || 1}" 
                                data-task="${task.task_type}"
-                               onchange="validateTotalRequirements()">
-                        <span>人</span>
+                               onchange="validateTaskRequirement(this, '${task.task_type}')">
+                        <span>人 (上限:${taskCapacity[task.task_type] || 0}人)</span>
                         <div></div>
                         <select data-task="${task.task_type}" data-field="morning_start_hour" id="morningStartH_${index}" style="width: 60px; text-align: center;"></select>
                         <span>:</span>
@@ -908,10 +974,11 @@
                 afternoonHTML += tasks.map((task, index) => `
                     <div class="requirement-item">
                         <label>${task.name}</label>
-                        <input type="number" min="0" value="${defaults[task.task_type] || task.required_people || 1}" 
+                        <input type="number" min="0" max="${taskCapacity[task.task_type] || 0}" 
+                               value="${defaults[task.task_type] || task.required_people || 1}" 
                                data-task="${task.task_type}"
-                               onchange="validateTotalRequirements()">
-                        <span>人</span>
+                               onchange="validateTaskRequirement(this, '${task.task_type}')">
+                        <span>人 (上限:${taskCapacity[task.task_type] || 0}人)</span>
                         <div></div>
                         <select data-task="${task.task_type}" data-field="afternoon_start_hour" id="afternoonStartH_${index}" style="width: 60px; text-align: center;"></select>
                         <span>:</span>
@@ -1011,6 +1078,22 @@
                 console.error('従業員数取得エラー:', error);
                 return true;
             }
+        }
+
+        // 個別作業種別の人数バリデーション
+        function validateTaskRequirement(inputElement, taskType) {
+            const value = parseInt(inputElement.value) || 0;
+            const maxCapacity = window.taskCapacity ? window.taskCapacity[taskType] : 0;
+            
+            if (value > maxCapacity) {
+                alert(`この作業ができる従業員は${maxCapacity}人までです。`);
+                inputElement.value = maxCapacity;
+            } else if (value < 0) {
+                inputElement.value = 0;
+            }
+            
+            // 合計人数のバリデーションも実行
+            validateTotalRequirements();
         }
 
         // 午前シフト人数設定保存
