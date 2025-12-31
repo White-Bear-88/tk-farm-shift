@@ -5,9 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>シフト管理 - 酪農シフト管理システム</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
             margin: 0;
             padding: 20px;
             background: #f5f5f5;
@@ -371,11 +374,9 @@
                     <button id="generateShiftBtn" class="btn-success" onclick="generateMonthlyShifts(event, 'both')" title="選択した月のシフトを自動生成します">シフト自動生成</button>
                 </div>
             </div>
-            <div id="calendarLoadingContainer" class="loading-container" style="display: none;">
-                <div class="spinner-loader">
-                    <div class="spinner"></div>
-                </div>
-                <div class="loading-text">カレンダーを読み込み中...</div>
+            <div id="calendarLoadingContainer" style="display: none; text-align: center; padding: 20px; color: #666;">
+                <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                <span>カレンダーを読み込み中...</span>
             </div>
             <div class="shift-calendar" id="shiftCalendar"></div>
             <div id="calendarMessage"></div>
@@ -394,7 +395,11 @@
             <p style="color: #666; font-size: 14px;">
                 例: 25日に設定すると、毎月25日に翌月のシフトが確定されます。
             </p>
-            <button onclick="saveConfirmationSettings()">保存</button>
+            <button id="saveConfirmationBtn" onclick="saveConfirmationSettings()">保存</button>
+            <div id="confirmationSpinner" style="display: none; margin-top: 10px; text-align: left;">
+                <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                <span style="font-size: 14px; color: #666;">更新中</span>
+            </div>
             <div id="confirmationMessage"></div>
         </div>
     </div>
@@ -603,21 +608,23 @@
             setTimeout(() => messageDiv.innerHTML = '', 5000);
         }
 
-
         // シフト確定日設定保存
         async function saveConfirmationSettings() {
-            const button = event.target;
-            const originalText = button.textContent;
-            button.textContent = '🔄 更新中...';
-            setButtonLoading(button, true);
+            const button = document.getElementById('saveConfirmationBtn');
+            const spinner = document.getElementById('confirmationSpinner');
+            const messageDiv = document.getElementById('confirmationMessage');
             
             const day = parseInt(document.getElementById('confirmationDay').value);
             
             if (!day || day < 1 || day > 31) {
                 showMessage('confirmationMessage', 'error', '有効な日付を入力してください（1-31）');
-                setButtonLoading(button, false);
                 return;
             }
+
+            // スピナー表示
+            button.style.display = 'none';
+            spinner.style.display = 'block';
+            messageDiv.innerHTML = '';
 
             const data = {
                 confirmation_day: day
@@ -641,8 +648,8 @@
             } catch (error) {
                 showMessage('confirmationMessage', 'error', `エラー: ${error.message}`);
             } finally {
-                button.textContent = originalText;
-                setButtonLoading(button, false);
+                button.style.display = 'inline-block';
+                spinner.style.display = 'none';
             }
         }
 

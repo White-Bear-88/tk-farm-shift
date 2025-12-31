@@ -74,6 +74,16 @@ def get_all_vacation_requests():
         
         items = response.get('Items', [])
         
+        # 各itemにrequest_idを確実に設定
+        for item in items:
+            if 'request_id' not in item:
+                # PKとSKからrequest_idを生成（_区切り）
+                pk = item.get('PK', '')
+                sk = item.get('SK', '')
+                employee_id = pk.replace('EMPLOYEE#', '')
+                timestamp = sk.replace('VACATION#', '')
+                item['request_id'] = f'{employee_id}_{timestamp}'
+        
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
@@ -99,6 +109,14 @@ def get_vacation_requests_by_employee(employee_id):
         )
         
         items = response.get('Items', [])
+        
+        # 各itemにrequest_idを確実に設定
+        for item in items:
+            if 'request_id' not in item:
+                # SKからタイムスタンプを抽出してrequest_idを生成（_区切り）
+                sk = item.get('SK', '')
+                timestamp = sk.replace('VACATION#', '')
+                item['request_id'] = f'{employee_id}_{timestamp}'
         
         # 日付でソート（降順）
         items.sort(key=lambda x: x.get('start_date', ''), reverse=True)
@@ -136,9 +154,9 @@ def create_vacation_request(event):
                 'body': json.dumps({'error': '従業員IDと開始日は必須です'})
             }
         
-        # タイムスタンプをリクエストIDとして使用
+        # タイムスタンプをリクエストIDとして使用（#の代わりに_を使用）
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S%f')
-        request_id = f'{employee_id}#{timestamp}'
+        request_id = f'{employee_id}_{timestamp}'
         
         item = {
             'PK': f'EMPLOYEE#{employee_id}',
@@ -180,8 +198,8 @@ def update_vacation_request(request_id, event):
     try:
         data = json.loads(event.get('body', '{}'))
         
-        # request_idから従業員IDとタイムスタンプを抽出
-        parts = request_id.split('#')
+        # request_idから従業員IDとタイムスタンプを抽出（_区切り）
+        parts = request_id.split('_')
         if len(parts) < 2:
             return {
                 'statusCode': 400,
@@ -240,8 +258,8 @@ def update_vacation_request(request_id, event):
 def delete_vacation_request(request_id):
     """休暇申請を削除"""
     try:
-        # request_idから従業員IDとタイムスタンプを抽出
-        parts = request_id.split('#')
+        # request_idから従業員IDとタイムスタンプを抽出（_区切り）
+        parts = request_id.split('_')
         if len(parts) < 2:
             return {
                 'statusCode': 400,

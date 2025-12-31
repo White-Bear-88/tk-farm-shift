@@ -5,9 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>従業員管理 - 酪農シフト管理システム</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
             margin: 0;
             padding: 20px;
             background: #f5f5f5;
@@ -217,11 +220,9 @@
             <div style="margin-bottom: 20px;">
                 <button onclick="openEmployeeModal()">追加</button>
             </div>
-            <div id="employeeListSpinner" class="loading-container">
-                <div class="spinner-loader">
-                    <div class="spinner"></div>
-                </div>
-                <div class="loading-text">読み込み中...</div>
+            <div id="employeeListSpinner" style="display: block; text-align: center; padding: 20px; color: #666;">
+                <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                <span>読み込み中...</span>
             </div>
             <div id="employeeList" class="employee-list"></div>
         </div>
@@ -231,14 +232,14 @@
                 <h2 style="margin: 0;">休暇日数（規定値）</h2>
                 <button onclick="openVacationTypeModal()" style="padding: 8px 16px;">追加</button>
             </div>
-            <p style="margin: 0 0 15px 0; font-size: 12px; color: #666;">0日の場合は設定無しとなります。</p>
+            <p style="margin: 0 0 15px 0; font-size: 12px; color: #666;">0日の場合は上限無しとなります。</p>
             <div id="vacationTypesList" style="margin-bottom: 20px;">
                 <div class="form-group" style="padding: 15px; background: #f8f9fa; border-radius: 5px; margin-bottom: 10px;">
                     <h3 style="margin: 0 0 10px 0; font-size: 16px;">通常休暇</h3>
                     <div style="display: flex; gap: 30px; font-size: 14px;">
                         <div>
                             <span>年間</span>
-                            <input type="number" id="annualVacationDays" min="0" value="0" placeholder="0" style="width: 60px; margin: 0 5px;">
+                            <input type="number" id="annualVacationDays" min="0" value="60" placeholder="60" style="width: 60px; margin: 0 5px;">
                             <span>日まで</span>
                         </div>
                         <div>
@@ -253,7 +254,7 @@
                     <div style="display: flex; gap: 30px; font-size: 14px;">
                         <div>
                             <span>年間</span>
-                            <input type="number" id="defaultVacationDays" min="0" value="20" placeholder="20" style="width: 60px; margin: 0 5px;">
+                            <input type="number" id="defaultVacationDays" min="0" value="10" placeholder="10" style="width: 60px; margin: 0 5px;">
                             <span>日まで</span>
                         </div>
                         <div>
@@ -266,22 +267,51 @@
                 <div id="customVacationTypes"></div>
             </div>
             <button id="saveVacationDefaultsBtn" onclick="saveAllVacationDefaults()">保存</button>
-            <div id="vacationDefaultSpinner" class="loading-container" style="display: none; margin-top: 15px;">
-                <div class="spinner-loader">
-                    <div class="spinner"></div>
-                </div>
-                <div class="loading-text">更新しています。</div>
+            <div id="vacationDefaultSpinner" style="display: none; margin-top: 10px;">
+                <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                <span style="font-size: 14px; color: #666;">更新しています。</span>
             </div>
             <div id="vacationDefaultMessage"></div>
         </div>
 
         <div class="section">
             <h2>休暇申請管理</h2>
-            <div id="allVacationRequestsSpinner" class="loading-container" style="display: flex;">
-                <div class="spinner-loader">
-                    <div class="spinner"></div>
+            <div style="display: flex; gap: 15px; margin-bottom: 15px; align-items: center;">
+                <div>
+                    <label>年:</label>
+                    <select id="vacationAdminFilterYear" onchange="loadAllVacationRequests()" style="width: 120px;">
+                        <!-- 年のオプションはJavaScriptで生成 -->
+                    </select>
                 </div>
-                <div class="loading-text">読み込み中...</div>
+                <div>
+                    <label>月:</label>
+                    <select id="vacationAdminFilterMonth" onchange="loadAllVacationRequests()" style="width: 120px;">
+                        <option value="all">全て</option>
+                        <option value="1">1月</option>
+                        <option value="2">2月</option>
+                        <option value="3">3月</option>
+                        <option value="4">4月</option>
+                        <option value="5">5月</option>
+                        <option value="6">6月</option>
+                        <option value="7">7月</option>
+                        <option value="8">8月</option>
+                        <option value="9">9月</option>
+                        <option value="10">10月</option>
+                        <option value="11">11月</option>
+                        <option value="12">12月</option>
+                    </select>
+                </div>
+                <div>
+                    <label>従業員名:</label>
+                    <select id="vacationAdminFilterEmployee" onchange="loadAllVacationRequests()" style="width: 150px;">
+                        <option value="all">全て</option>
+                        <!-- 従業員のオプションはJavaScriptで生成 -->
+                    </select>
+                </div>
+            </div>
+            <div id="allVacationRequestsSpinner" style="display: flex; padding: 20px; justify-content: center; color: #666;">
+                <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                <span>読み込み中...</span>
             </div>
             <div id="allVacationRequestsList" style="margin-top: 20px; display: none;">
                 <table style="width: 100%; border-collapse: collapse;">
@@ -421,8 +451,12 @@
                         </div>
                     </div>
                     <button type="submit">追加</button>
-                    <button type="button" onclick="closeVacationTypeModal()">キャンセル</button>
+                    <button type="button" onclick="closeVacationTypeModal()">戻る</button>
                 </form>
+                <div id="vacationTypeSpinner" style="display: none; margin-top: 10px; text-align: center; color: #666;">
+                    <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                    <span>更新中...</span>
+                </div>
                 <div id="vacationTypeFormMessage"></div>
             </div>
         </div>
@@ -668,7 +702,6 @@
                 })
                 .catch(error => showMessage('formMessage', 'error', `エラー: ${error.message}`));
         }
-        }
 
         // 従業員削除
         async function deleteEmployee(employeeId) {
@@ -767,7 +800,15 @@
             container.appendChild(newItem);
             
             closeVacationTypeModal();
-            showMessage('vacationDefaultMessage', 'success', `✓ ${name}を追加しました。「保存」ボタンを押して確定してください。`);
+            
+            // スピナーを表示
+            document.getElementById('vacationTypeSpinner').style.display = 'block';
+            
+            // 少し待ってからメッセージを表示してスピナーを非表示
+            setTimeout(() => {
+                document.getElementById('vacationTypeSpinner').style.display = 'none';
+                showMessage('vacationDefaultMessage', 'success', `✓ ${name}を追加しました。「保存」ボタンを押して確定してください。`);
+            }, 500);
         });
 
         // カスタム休暇種別の削除
@@ -861,22 +902,22 @@
                 const response = await fetch(`${API_BASE}/settings/vacation-default`);
                 if (response.ok) {
                     const settings = await response.json();
-                    document.getElementById('defaultVacationDays').value = settings.default_vacation_days || 20;
-                    document.getElementById('annualVacationDays').value = settings.annual_vacation_days || 0;
+                    document.getElementById('defaultVacationDays').value = settings.default_vacation_days || 10;
+                    document.getElementById('annualVacationDays').value = settings.annual_vacation_days || 60;
                     document.getElementById('monthlyVacationLimit').value = settings.monthly_vacation_limit || 0;
                     document.getElementById('paidMonthlyLimit').value = settings.paid_monthly_limit || 0;
                 } else {
                     console.warn('Vacation default settings API returned error, using default value');
-                    document.getElementById('defaultVacationDays').value = 20;
-                    document.getElementById('annualVacationDays').value = 0;
+                    document.getElementById('defaultVacationDays').value = 10;
+                    document.getElementById('annualVacationDays').value = 60;
                     document.getElementById('monthlyVacationLimit').value = 0;
                     document.getElementById('paidMonthlyLimit').value = 0;
                 }
             } catch (error) {
                 console.log('デフォルト有給設定読み込み失敗（エンドポイントなし）:', error);
                 // フォールバック: デフォルト値を使用
-                document.getElementById('defaultVacationDays').value = 20;
-                document.getElementById('annualVacationDays').value = 0;
+                document.getElementById('defaultVacationDays').value = 10;
+                document.getElementById('annualVacationDays').value = 60;
                 document.getElementById('monthlyVacationLimit').value = 0;
                 document.getElementById('paidMonthlyLimit').value = 0;
             }
@@ -896,6 +937,37 @@
                 // 全従業員を取得
                 const employeesResponse = await fetch(`${API_BASE}/employees`);
                 const employees = await employeesResponse.json();
+                
+                // 従業員プルダウンを初期化（最初の呼び出し時のみ）
+                const employeeFilter = document.getElementById('vacationAdminFilterEmployee');
+                if (employeeFilter.options.length === 1) { // 「全て」だけの場合
+                    employees.forEach(emp => {
+                        const option = document.createElement('option');
+                        option.value = emp.employee_id;
+                        option.textContent = emp.name;
+                        employeeFilter.appendChild(option);
+                    });
+                }
+                
+                // 年プルダウンを初期化（最初の呼び出し時のみ）
+                const yearFilter = document.getElementById('vacationAdminFilterYear');
+                if (yearFilter.options.length === 0) {
+                    const currentYear = new Date().getFullYear();
+                    const allOption = document.createElement('option');
+                    allOption.value = 'all';
+                    allOption.textContent = '全て';
+                    yearFilter.appendChild(allOption);
+                    
+                    for (let year = currentYear - 1; year <= currentYear + 1; year++) {
+                        const option = document.createElement('option');
+                        option.value = year;
+                        option.textContent = `${year}年`;
+                        if (year === currentYear) {
+                            option.selected = true;
+                        }
+                        yearFilter.appendChild(option);
+                    }
+                }
                 
                 // 従業員IDと名前のマップを作成
                 const employeeMap = {};
@@ -929,7 +1001,7 @@
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
                 
-                const filteredRequests = allRequests.filter(req => {
+                let filteredRequests = allRequests.filter(req => {
                     const endDate = new Date(req.end_date || req.start_date || req.date);
                     endDate.setHours(0, 0, 0, 0);
                     
@@ -937,6 +1009,34 @@
                     if (endDate < today && req.status === 'approved') {
                         return false;
                     }
+                    return true;
+                });
+                
+                // フィルター適用
+                const filterYear = document.getElementById('vacationAdminFilterYear').value;
+                const filterMonth = document.getElementById('vacationAdminFilterMonth').value;
+                const filterEmployee = document.getElementById('vacationAdminFilterEmployee').value;
+                
+                filteredRequests = filteredRequests.filter(req => {
+                    const startDate = new Date(req.start_date || req.date);
+                    const reqYear = startDate.getFullYear();
+                    const reqMonth = startDate.getMonth() + 1;
+                    
+                    // 年でフィルタ
+                    if (filterYear !== 'all' && reqYear !== parseInt(filterYear)) {
+                        return false;
+                    }
+                    
+                    // 月でフィルタ
+                    if (filterMonth !== 'all' && reqMonth !== parseInt(filterMonth)) {
+                        return false;
+                    }
+                    
+                    // 従業員名でフィルタ
+                    if (filterEmployee !== 'all' && req.employee_id !== filterEmployee) {
+                        return false;
+                    }
+                    
                     return true;
                 });
                 
@@ -1028,9 +1128,12 @@
                     alert('✓ 休暇申請を承認しました。');
                     loadAllVacationRequests(); // 一覧を再読み込み
                 } else {
-                    throw new Error('承認に失敗しました');
+                    const errorData = await response.json();
+                    console.error('Error response:', errorData);
+                    throw new Error(errorData.error || '承認に失敗しました');
                 }
             } catch (error) {
+                console.error('Approval error:', error);
                 alert(`エラー: ${error.message}`);
             }
         }

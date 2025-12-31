@@ -8,9 +8,12 @@
     <meta http-equiv="Expires" content="0">
     <title>作業管理 - 酪農シフト管理システム</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
             margin: 0;
             padding: 20px;
             background: #f5f5f5;
@@ -268,6 +271,7 @@
 
         <div class="section">
             <h2>作業人数・作業時間（規定値）</h2>
+            <p style="color: #666; font-size: 14px; margin: 10px 0 20px 0;">※各作業種別の作業時間の初期値となります</p>
             
             <!-- 午前シフト -->
             <h3>午前シフト</h3>
@@ -280,18 +284,15 @@
                 <select id="morningShiftEndHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
                 <span>:</span>
                 <select id="morningShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;"></select>
-                <span style="margin-left: 15px; color: #666; font-size: 14px;">※各作業種別の作業時間の初期値となります</span>
             </div>
             <div id="morningRequirements"></div>
             <div id="morningValidation" style="margin-top: 10px;"></div>
             
             <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
                 <button id="saveMorningRequirementsBtn" onclick="saveMorningRequirements()">保存</button>
-                <div id="morningSaveSpinner" class="loading-container" style="min-height: auto; display: none;">
-                    <div class="spinner-loader">
-                        <div class="spinner"></div>
-                    </div>
-                    <div class="loading-text">更新中</div>
+                <div id="morningSaveSpinner" style="display: none;">
+                    <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                    <span style="font-size: 14px; color: #666;">更新中</span>
                 </div>
                 <div id="morningRequirementsMessage"></div>
             </div>
@@ -307,18 +308,15 @@
                 <select id="afternoonShiftEndHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
                 <span>:</span>
                 <select id="afternoonShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;"></select>
-                <span style="margin-left: 15px; color: #666; font-size: 14px;">※各作業種別の作業時間の初期値となります</span>
             </div>
             <div id="afternoonRequirements"></div>
             <div id="afternoonValidation" style="margin-top: 10px;"></div>
             
             <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
                 <button id="saveAfternoonRequirementsBtn" onclick="saveAfternoonRequirements()">保存</button>
-                <div id="afternoonSaveSpinner" class="loading-container" style="min-height: auto; display: none;">
-                    <div class="spinner-loader">
-                        <div class="spinner"></div>
-                    </div>
-                    <div class="loading-text">更新中</div>
+                <div id="afternoonSaveSpinner" style="display: none;">
+                    <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                    <span style="font-size: 14px; color: #666;">更新中</span>
                 </div>
                 <div id="afternoonRequirementsMessage"></div>
             </div>
@@ -344,8 +342,7 @@
                         <textarea id="taskDescription" placeholder="作業の詳細説明を入力してください"></textarea>
                     </div>
                     <button type="submit" id="submitBtn">登録</button>
-                    <button type="button" onclick="resetFormWithConfirm()">クリア</button>
-                    <button type="button" id="cancelModalBtn" onclick="closeTaskModal()">キャンセル</button>
+                    <button type="button" id="cancelModalBtn" onclick="closeTaskModal()">戻る</button>
                 </form>
                 <div id="formMessage"></div>
             </div>
@@ -892,10 +889,22 @@
                 const employees = await fetch(`${API_BASE}/employees`).then(r => r.json());
                 const taskCapacity = {};
                 
+                // 作業種別IDのマッピング（新ID → 旧ID）
+                const taskIdMapping = {
+                    '1': 'milking',
+                    '2': 'feeding', 
+                    '3': 'cleaning',
+                    '4': 'patrol'
+                };
+                
                 tasks.forEach(task => {
                     // この作業ができる従業員を数える
+                    const oldTaskId = taskIdMapping[task.task_type] || task.task_type;
                     const capableEmployees = employees.filter(emp => 
-                    emp.skills && emp.skills.includes(task.task_type)
+                        emp.skills && emp.skills.includes(oldTaskId)
+                    );
+                    taskCapacity[task.task_type] = capableEmployees.length;
+                });
                 
                 // taskCapacityをグローバル変数として保存
                 window.taskCapacity = taskCapacity;
@@ -929,14 +938,7 @@
                         <div>作業種別</div>
                         <div>人数</div>
                         <div></div>
-                        <div></div>
-                        <div colspan="2" style="text-align: center;">作業時間</div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
+                        <div style="grid-column: span 8; text-align: center;">作業時間</div>
                     </div>
                 `;
                 morningHTML += tasks.map((task, index) => `
@@ -948,7 +950,6 @@
                                oninput="validateTaskRequirement(this, '${task.task_type}')"
                                onchange="validateTaskRequirement(this, '${task.task_type}')">
                         <span style="white-space: nowrap; font-size: 13px;">人(上限:${taskCapacity[task.task_type] || 0}人)</span>
-                        <span class="error-message" data-error-for="${task.task_type}" style="color: red; font-size: 12px; grid-column: 2 / 4;"></span>
                         <div></div>
                         <select data-task="${task.task_type}" data-field="morning_start_hour" id="morningStartH_${index}" style="width: 60px; text-align: center;"></select>
                         <span>:</span>
@@ -958,6 +959,9 @@
                         <span>:</span>
                         <select data-task="${task.task_type}" data-field="morning_end_minute" id="morningEndM_${index}" style="width: 60px; text-align: center;"></select>
                         <span></span>
+                    </div>
+                    <div style="grid-column: 1 / -1; margin: -5px 0 5px 0;">
+                        <span class="error-message" data-error-for="${task.task_type}" style="color: red; font-size: 12px;"></span>
                     </div>
                 `).join('');
                 morningContainer.innerHTML = morningHTML;
@@ -981,14 +985,7 @@
                         <div>作業種別</div>
                         <div>人数</div>
                         <div></div>
-                        <div></div>
-                        <div colspan="2" style="text-align: center;">作業時間</div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
+                        <div style="grid-column: span 8; text-align: center;">作業時間</div>
                     </div>
                 `;
                 afternoonHTML += tasks.map((task, index) => `
@@ -1000,7 +997,6 @@
                                oninput="validateTaskRequirement(this, '${task.task_type}')"
                                onchange="validateTaskRequirement(this, '${task.task_type}')">
                         <span style="white-space: nowrap; font-size: 13px;">人(上限:${taskCapacity[task.task_type] || 0}人)</span>
-                        <span class="error-message" data-error-for="${task.task_type}" style="color: red; font-size: 12px; grid-column: 2 / 4;"></span>
                         <div></div>
                         <select data-task="${task.task_type}" data-field="afternoon_start_hour" id="afternoonStartH_${index}" style="width: 60px; text-align: center;"></select>
                         <span>:</span>
@@ -1010,6 +1006,9 @@
                         <span>:</span>
                         <select data-task="${task.task_type}" data-field="afternoon_end_minute" id="afternoonEndM_${index}" style="width: 60px; text-align: center;"></select>
                         <span></span>
+                    </div>
+                    <div style="grid-column: 1 / -1; margin: -5px 0 5px 0;">
+                        <span class="error-message" data-error-for="${task.task_type}" style="color: red; font-size: 12px;"></span>
                     </div>
                 `).join('');
                 afternoonContainer.innerHTML = afternoonHTML;
