@@ -353,6 +353,19 @@
             margin-right: 8px;
             vertical-align: middle;
         }
+        /* datalistのドロップダウンの高さを制限 */
+        input[list]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+        }
+        input[list] {
+            position: relative;
+        }
+        /* Chrome/Edge用 - datalistのドロップダウンサイズ制限 */
+        @supports (-webkit-appearance: none) {
+            input[list]::-webkit-list-button {
+                height: 150px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -365,14 +378,21 @@
         <div class="section">
             <h2>シフトカレンダー</h2>
             <div class="calendar-controls">
-                <div class="month-selector">
+                <div class="month-selector" style="display: flex; align-items: center; gap: 10px;">
                     <label>表示月:</label>
-                    <input type="month" id="calendarMonth" onchange="updateShiftCalendar()">
-                    <span id="pastMonthMessage" style="margin-left: 15px; color: #dc3545; font-size: 14px;"></span>
+                    <input type="month" id="calendarMonth" onchange="updateShiftCalendar()" style="width: 160px;">
                 </div>
                 <div class="auto-generate">
                     <button id="generateShiftBtn" class="btn-success" onclick="generateMonthlyShifts(event, 'both')" title="選択した月のシフトを自動生成します">シフト自動生成</button>
+                    <button id="confirmShiftBtn" style="display: none; margin-left: 10px;" onclick="confirmGeneratedShifts()">確定</button>
+                    <span id="generateShiftSpinner" style="display: none; color: #666; margin-left: 10px;">
+                        <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                        <span>処理中…</span>
+                    </span>
                 </div>
+            </div>
+            <div style="margin-top: 10px;">
+                <span id="pastMonthMessage" style="color: #dc3545; font-size: 14px;"></span>
             </div>
             <div id="calendarLoadingContainer" style="display: none; color: #666; margin-top: 10px;">
                 <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
@@ -1154,6 +1174,14 @@
             const monthValue = document.getElementById('calendarMonth').value;
             const disabled = isMonthInPast(monthValue);
             
+            const generateBtn = document.getElementById('generateShiftBtn');
+            if (generateBtn) {
+                generateBtn.disabled = disabled;
+                generateBtn.style.opacity = disabled ? '0.6' : '1';
+                generateBtn.style.cursor = disabled ? 'not-allowed' : 'pointer';
+                generateBtn.title = disabled ? '過去月のため自動生成できません' : '選択した月のシフトを自動生成します';
+            }
+            
             const morningBtn = document.getElementById('generateMorningBtn');
             if (morningBtn) {
                 morningBtn.disabled = disabled;
@@ -1202,15 +1230,23 @@
             return fallback;
         }
 
-        // 月間シフト自動生成 (対象は常に表示月)。使用する必要人数は、UIに表示されているグローバルデフォルト値を利用する
+        // グローバル変数：生成されたシフトデータを保持
+        let generatedShiftsData = null;
+
+        // 月間シフト自動生成
         async function generateMonthlyShifts(event, shiftType = 'both') {
             console.log('シフト自動生成ボタンがクリックされました。shiftType:', shiftType);
             
             const button = event?.target;
-            const originalText = button?.textContent;
+            const spinner = document.getElementById('generateShiftSpinner');
+            const confirmBtn = document.getElementById('confirmShiftBtn');
+            
             if (button) {
-                button.textContent = '🔄 処理中...';
+                button.disabled = true;
                 setButtonLoading(button, true);
+            }
+            if (spinner) {
+                spinner.style.display = 'inline';
             }
             
             const monthValue = document.getElementById('calendarMonth').value;
@@ -1219,69 +1255,51 @@
             if (!monthValue) {
                 showMessage('generateMessage', 'error', '月を選択してください');
                 if (button) {
-                    button.textContent = originalText;
+                    button.disabled = false;
                     setButtonLoading(button, false);
+                }
+                if (spinner) {
+                    spinner.style.display = 'none';
                 }
                 return;
             }
-            if (isMonthInPast(monthValue)) {
-                console.log('過去の月が選択されています:', monthValue);
-                showMessage('generateMessage', 'error', '表示月が過去のため、自動シフト生成できません');
-                if (button) {
-                    button.textContent = originalText;
-                    setButtonLoading(button, false);
-                }
-                return;
-            }
-            const requirements = await getCurrentDefaultRequirements();
-            console.log('使用する人数設定:', requirements);
-
-            // Preview generation first (do not commit) — reflect on calendar instead of modal
+            
             try {
-                console.log('APIリクエストを送信中...');
-                const previewRes = await fetch(`${API_BASE}/shifts/generate-monthly`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        month: monthValue, 
-                        overwrite: false, 
-                        preview: true, 
-                        requirements,
-                        shift_type: shiftType  // 'morning', 'afternoon', or 'both'
-                    })
-                });
-                
-                console.log('APIレスポンスステータス:', previewRes.status);
-                
-                if (!previewRes.ok) {
-                    // APIからのエラーレスポンスを解析
-                    let errorMessage = 'シフト生成プレビューに失敗しました';
-                    try {
-                        const errorData = await previewRes.json();
-                        console.log('APIエラーレスポンス:', errorData);
-                        if (errorData.error) {
-                            errorMessage = errorData.error;
+                // 既存シフトをチェック
+                const existingShifts = await checkExistingShifts(monthValue);
+                if (existingShifts && existingShifts.length > 0) {
+                    if (!confirm('既に登録データがありますが、上書きしますか？')) {
+                        if (button) {
+                            button.disabled = false;
+                            setButtonLoading(button, false);
                         }
-                    } catch (e) {
-                        // JSONパースに失敗した場合はテキストを取得
-                        try {
-                            const textError = await previewRes.text();
-                            console.log('APIエラーテキスト:', textError);
-                            errorMessage = textError || errorMessage;
-                        } catch (e2) {
-                            // テキスト取得も失敗した場合はデフォルトメッセージ
-                            console.log('エラーレスポンスの解析に失敗:', e2);
+                        if (spinner) {
+                            spinner.style.display = 'none';
                         }
+                        return;
                     }
-                    throw new Error(errorMessage);
                 }
                 
-                const previewData = await previewRes.json();
-                console.log('プレビューデータを受信:', previewData);
+                // シフトを生成
+                const shifts = await generateShiftsLocally(monthValue);
                 
-                if (previewData.shifts && previewData.shifts.length > 0) {
-                    // Apply preview to calendar (client-side only)
-                    applyPreviewToCalendar(monthValue, previewData.shifts);
+                if (shifts && shifts.length > 0) {
+                    // グローバル変数に保存
+                    generatedShiftsData = {
+                        month: monthValue,
+                        shifts: shifts,
+                        existingShifts: existingShifts
+                    };
+                    
+                    // カレンダーに表示（午前=青、午後=緑）
+                    displayGeneratedShifts(monthValue, shifts);
+                    
+                    // 確定ボタンを表示
+                    if (confirmBtn) {
+                        confirmBtn.style.display = 'inline-block';
+                    }
+                    
+                    showMessage('generateMessage', 'success', 'シフトを生成しました。確定ボタンを押してください。');
                 } else {
                     showMessage('generateMessage', 'error', 'シフトが生成されませんでした。従業員データや人数設定を確認してください。');
                 }
@@ -1290,9 +1308,218 @@
                 showMessage('generateMessage', 'error', `エラー: ${error.message}`);
             } finally {
                 if (button) {
-                    button.textContent = originalText;
+                    button.disabled = false;
                     setButtonLoading(button, false);
                 }
+                if (spinner) {
+                    spinner.style.display = 'none';
+                }
+            }
+        }
+        
+        // ローカルでシフトを生成
+        async function generateShiftsLocally(monthValue) {
+            // 従業員データ取得
+            const employeesRes = await fetch(`${API_BASE}/employees`);
+            const employees = await employeesRes.json();
+            
+            // 作業種別取得
+            const tasksRes = await fetch(`${API_BASE}/tasks`);
+            const tasks = await tasksRes.json();
+            
+            // 休暇申請取得
+            const vacationsRes = await fetch(`${API_BASE}/vacation-requests`);
+            const vacations = await vacationsRes.json();
+            
+            // 必要人数取得
+            const requirements = await getCurrentDefaultRequirements();
+            
+            // その月の全日を取得
+            const [year, month] = monthValue.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            
+            const shifts = [];
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                // その日に利用可能な従業員（休暇申請がない従業員）
+                const availableEmployees = employees.filter(emp => {
+                    const hasVacation = vacations.some(vac => 
+                        vac.employee_id === emp.employee_id && 
+                        vac.status === 'approved' &&
+                        date >= vac.start_date && date <= (vac.end_date || vac.start_date)
+                    );
+                    return !hasVacation;
+                });
+                
+                // 午前シフト割り当て
+                const morningAssignments = assignShifts(availableEmployees, tasks, requirements, 'morning');
+                morningAssignments.forEach(assignment => {
+                    shifts.push({
+                        date: date,
+                        employee_id: assignment.employee_id,
+                        shift_type: 'morning',
+                        task_type: assignment.task_type,
+                        start_time: assignment.start_time,
+                        end_time: assignment.end_time
+                    });
+                });
+                
+                // 午後シフト割り当て（午前と同じメンバーを優先）
+                const afternoonAssignments = assignShifts(availableEmployees, tasks, requirements, 'afternoon', morningAssignments.map(a => a.employee_id));
+                afternoonAssignments.forEach(assignment => {
+                    shifts.push({
+                        date: date,
+                        employee_id: assignment.employee_id,
+                        shift_type: 'afternoon',
+                        task_type: assignment.task_type,
+                        start_time: assignment.start_time,
+                        end_time: assignment.end_time
+                    });
+                });
+            }
+            
+            return shifts;
+        }
+        
+        // シフト割り当てロジック
+        function assignShifts(availableEmployees, tasks, requirements, shiftType, preferredEmployeeIds = []) {
+            const assignments = [];
+            const assignedEmployees = new Set();
+            
+            // 作業種別ごとに割り当て
+            tasks.forEach(task => {
+                const requiredCount = requirements[task.task_type] || 0;
+                if (requiredCount === 0) return;
+                
+                // この作業ができる従業員
+                const capableEmployees = availableEmployees.filter(emp => 
+                    emp.skills && emp.skills.includes(task.task_type) && !assignedEmployees.has(emp.employee_id)
+                );
+                
+                // 優先従業員（午前と午後で同じメンバー）
+                const preferred = capableEmployees.filter(emp => preferredEmployeeIds.includes(emp.employee_id));
+                const others = capableEmployees.filter(emp => !preferredEmployeeIds.includes(emp.employee_id));
+                
+                const candidates = [...preferred, ...others];
+                
+                // 必要人数分割り当て
+                for (let i = 0; i < Math.min(requiredCount, candidates.length); i++) {
+                    const emp = candidates[i];
+                    assignedEmployees.add(emp.employee_id);
+                    
+                    const startTime = shiftType === 'morning' ? (task.morning_start_time || '05:00') : (task.afternoon_start_time || '13:00');
+                    const endTime = shiftType === 'morning' ? (task.morning_end_time || '12:00') : (task.afternoon_end_time || '18:00');
+                    
+                    assignments.push({
+                        employee_id: emp.employee_id,
+                        task_type: task.task_type,
+                        start_time: startTime,
+                        end_time: endTime
+                    });
+                }
+            });
+            
+            return assignments;
+        }
+        
+        // 生成されたシフトをカレンダーに表示
+        function displayGeneratedShifts(monthValue, shifts) {
+            const calendar = document.getElementById('shiftCalendar');
+            if (!calendar) return;
+            
+            // 既存のカレンダーを更新
+            const cells = calendar.querySelectorAll('.calendar-cell');
+            cells.forEach(cell => {
+                const dateStr = cell.dataset.date;
+                if (!dateStr) return;
+                
+                const dayShifts = shifts.filter(s => s.date === dateStr);
+                if (dayShifts.length === 0) return;
+                
+                // 既存の内容をクリア
+                const existingShifts = cell.querySelector('.shift-list');
+                if (existingShifts) {
+                    existingShifts.remove();
+                }
+                
+                // シフトを表示
+                const shiftList = document.createElement('div');
+                shiftList.className = 'shift-list';
+                shiftList.style.marginTop = '5px';
+                
+                const morningShifts = dayShifts.filter(s => s.shift_type === 'morning');
+                const afternoonShifts = dayShifts.filter(s => s.shift_type === 'afternoon');
+                
+                if (morningShifts.length > 0) {
+                    const morningDiv = document.createElement('div');
+                    morningDiv.style.fontSize = '11px';
+                    morningDiv.style.color = '#0066cc';
+                    morningDiv.style.fontWeight = 'bold';
+                    morningDiv.textContent = `午前: ${morningShifts.length}名`;
+                    shiftList.appendChild(morningDiv);
+                }
+                
+                if (afternoonShifts.length > 0) {
+                    const afternoonDiv = document.createElement('div');
+                    afternoonDiv.style.fontSize = '11px';
+                    afternoonDiv.style.color = '#28a745';
+                    afternoonDiv.style.fontWeight = 'bold';
+                    afternoonDiv.textContent = `午後: ${afternoonShifts.length}名`;
+                    shiftList.appendChild(afternoonDiv);
+                }
+                
+                cell.appendChild(shiftList);
+            });
+        }
+        
+        // 確定ボタン処理
+        async function confirmGeneratedShifts() {
+            if (!generatedShiftsData) {
+                showMessage('generateMessage', 'error', 'シフトデータがありません');
+                return;
+            }
+            
+            if (!confirm('確定しますか？')) {
+                return;
+            }
+            
+            try {
+                // 既存データがあれば削除
+                if (generatedShiftsData.existingShifts && generatedShiftsData.existingShifts.length > 0) {
+                    for (const shift of generatedShiftsData.existingShifts) {
+                        await fetch(`${API_BASE}/shifts/${shift.shift_id}`, {
+                            method: 'DELETE'
+                        });
+                    }
+                }
+                
+                // 新しいシフトを登録
+                for (const shift of generatedShiftsData.shifts) {
+                    await fetch(`${API_BASE}/shifts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(shift)
+                    });
+                }
+                
+                // 確定ボタンを非表示
+                const confirmBtn = document.getElementById('confirmShiftBtn');
+                if (confirmBtn) {
+                    confirmBtn.style.display = 'none';
+                }
+                
+                // データをリセット
+                generatedShiftsData = null;
+                
+                // カレンダーを再読み込み
+                await updateShiftCalendar();
+                
+                showMessage('generateMessage', 'success', 'シフトを確定しました');
+            } catch (error) {
+                console.error('シフト確定エラー:', error);
+                showMessage('generateMessage', 'error', `エラー: ${error.message}`);
             }
         }
 

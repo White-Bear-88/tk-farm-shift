@@ -163,6 +163,9 @@
             max-width: 600px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.2);
         }
+        #approveVacationModal .modal-content {
+            max-width: 400px;
+        }
         .close {
             color: #aaa;
             float: right;
@@ -206,7 +209,21 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
-        }    </style>
+        }
+        /* datalistのドロップダウンの高さを制限 */
+        input[list]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+        }
+        input[list] {
+            position: relative;
+        }
+        /* Chrome/Edge用 - datalistのドロップダウンサイズ制限 */
+        @supports (-webkit-appearance: none) {
+            input[list]::-webkit-list-button {
+                height: 150px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -218,7 +235,7 @@
         <div class="section">
             <h2>従業員一覧 <span id="employeeCount" style="font-size: 0.9em; color: #666;"></span></h2>
             <div style="margin-bottom: 20px;">
-                <button onclick="openEmployeeModal()">追加</button>
+                <button onclick="openEmployeeModal()">従業員追加</button>
             </div>
             <div id="employeeListSpinner" style="display: block; padding: 20px 0; color: #666;">
                 <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
@@ -229,9 +246,9 @@
         </div>
 
         <div class="section">
-            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 5px;">
-                <h2 style="margin: 0;">休暇日数（規定値）</h2>
-                <button onclick="openVacationTypeModal()" style="padding: 8px 16px;">追加</button>
+            <h2 style="margin: 0 0 5px 0;">休暇種別・日数設定（規定値）</h2>
+            <div style="margin-bottom: 5px;">
+                <button onclick="openVacationTypeModal()" style="padding: 8px 16px;">休暇種別追加</button>
             </div>
             <p style="margin: 0 0 15px 0; font-size: 12px; color: #666;">0日の場合は上限無しとなります。</p>
             <div id="vacationTypesList" style="margin-bottom: 20px;">
@@ -277,15 +294,15 @@
 
         <div class="section">
             <h2>休暇申請管理</h2>
-            <div style="display: flex; gap: 15px; margin-bottom: 15px; align-items: center;">
-                <div>
-                    <label>年:</label>
+            <div style="display: flex; gap: 15px; margin-bottom: 5px; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="white-space: nowrap;">年：</label>
                     <select id="vacationAdminFilterYear" onchange="loadAllVacationRequests()" style="width: 120px;">
                         <!-- 年のオプションはJavaScriptで生成 -->
                     </select>
                 </div>
-                <div>
-                    <label>月:</label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="white-space: nowrap;">月：</label>
                     <select id="vacationAdminFilterMonth" onchange="loadAllVacationRequests()" style="width: 120px;">
                         <option value="all">全て</option>
                         <option value="1">1月</option>
@@ -302,14 +319,15 @@
                         <option value="12">12月</option>
                     </select>
                 </div>
-                <div>
-                    <label>従業員名:</label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="white-space: nowrap;">従業員名：</label>
                     <select id="vacationAdminFilterEmployee" onchange="loadAllVacationRequests()" style="width: 150px;">
                         <option value="all">全て</option>
                         <!-- 従業員のオプションはJavaScriptで生成 -->
                     </select>
                 </div>
             </div>
+            <p style="color: #666; font-size: 12px; margin: 5px 0 15px 0;">※承認または取り下げボタンを押すと申請理由が参照できます。</p>
             <div id="allVacationRequestsSpinner" style="display: block; padding: 20px 0; color: #666;">
                 <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
                 <span>読み込み中...</span>
@@ -324,13 +342,12 @@
                             <th style="padding: 10px; text-align: left;">休暇種別</th>
                             <th style="padding: 10px; text-align: left;">時間区分</th>
                             <th style="padding: 10px; text-align: left;">ステータス</th>
-                            <th style="padding: 10px; text-align: left;">理由</th>
                             <th style="padding: 10px; text-align: left;">操作</th>
                         </tr>
                     </thead>
                     <tbody id="allVacationRequestsBody">
                         <tr>
-                            <td colspan="8" style="padding: 20px; text-align: center; color: #999;">申請データがありません</td>
+                            <td colspan="7" style="padding: 20px; text-align: center; color: #999;">申請データがありません</td>
                         </tr>
                     </tbody>
                 </table>
@@ -342,31 +359,38 @@
             <div class="modal-content">
                 <span class="close" onclick="closeEmployeeModal()">&times;</span>
                 <h2 id="modalTitle">従業員登録・編集</h2>
+                <div id="employeeFormSpinner" style="display: none; text-align: center; padding: 20px 0;">
+                    <span class="spinner" style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                    <div style="margin-top: 10px; color: #666;">読み込み中...</div>
+                </div>
                 <form id="employeeForm">
                     <input type="hidden" id="employeeId">
                     <input type="hidden" id="empId">
+                    <div id="empIdDisplay" class="form-group" style="display: none;">
+                        <p style="margin: 0 0 10px 0; font-size: 12px; color: #666;">従業員ID：<span id="empIdText"></span></p>
+                    </div>
                     <div class="form-group">
                         <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
                             <label style="min-width: 120px;">氏名:</label>
-                            <input type="text" id="empName" placeholder="例: 田中太郎" required style="flex: 1;">
+                            <input type="text" id="empName" placeholder="例: 田中太郎" required style="width: 250px;">
                         </div>
                     </div>
                     <div class="form-group">
                         <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
                             <label style="min-width: 120px;">かな氏名:</label>
-                            <input type="text" id="empKanaName" placeholder="例: たなかたろう" style="flex: 1;">
+                            <input type="text" id="empKanaName" placeholder="例: たなかたろう" style="width: 250px;">
                         </div>
                     </div>
                     <div class="form-group">
                         <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
                             <label style="min-width: 120px;">電話番号:</label>
-                            <input type="tel" id="empPhone" placeholder="例: 090-1234-5678" style="flex: 1;">
+                            <input type="tel" id="empPhone" placeholder="例: 090-1234-5678" style="width: 250px;">
                         </div>
                     </div>
                     <div class="form-group">
                         <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
                             <label style="min-width: 120px;">メールアドレス:</label>
-                            <input type="email" id="empEmail" placeholder="例: tanaka@example.com" style="flex: 1;">
+                            <input type="email" id="empEmail" placeholder="例: tanaka@example.com" style="width: 250px;">
                         </div>
                     </div>
                     <div class="form-group">
@@ -477,34 +501,93 @@
                 <h2>休暇申請取り下げ</h2>
                 <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <label style="font-weight: bold;">開始日:</label>
+                        <label style="font-weight: bold; display: inline;">開始日：</label>
                         <span id="withdrawStartDate"></span>
                     </div>
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <label style="font-weight: bold;">終了日:</label>
+                        <label style="font-weight: bold; display: inline;">終了日：</label>
                         <span id="withdrawEndDate"></span>
                     </div>
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <label style="font-weight: bold;">休暇種別:</label>
+                        <label style="font-weight: bold; display: inline;">休暇種別：</label>
                         <span id="withdrawVacationType"></span>
                     </div>
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <label style="font-weight: bold;">時間区分:</label>
+                        <label style="font-weight: bold; display: inline;">時間区分：</label>
                         <span id="withdrawTimeType"></span>
                     </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-weight: bold;">ステータス:</label>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-weight: bold; display: inline;">ステータス：</label>
                         <span id="withdrawStatus"></span>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-weight: bold; display: inline;">休暇理由：</label>
+                        <span id="withdrawVacationReason"></span>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>取り下げ理由: <span style="color: red;">*</span></label>
-                    <textarea id="withdrawReason" rows="4" placeholder="取り下げ理由を入力してください" required></textarea>
+                    <label style="display: block; margin-bottom: 10px;">取り下げ理由： <span style="color: red;">*</span></label>
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="withdrawReasonType" value="申請誤り" checked onchange="handleWithdrawReasonTypeChange()" style="width: auto; margin-right: 8px;">
+                            <span style="font-weight: normal;">申請誤り</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="withdrawReasonType" value="予定変更" onchange="handleWithdrawReasonTypeChange()" style="width: auto; margin-right: 8px;">
+                            <span style="font-weight: normal;">予定変更</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="withdrawReasonType" value="その他" onchange="handleWithdrawReasonTypeChange()" style="width: auto; margin-right: 8px;">
+                            <span style="font-weight: normal;">その他</span>
+                        </label>
+                    </div>
+                    <div id="withdrawReasonTextContainer" style="display: none;">
+                        <label style="display: block; margin-bottom: 5px;">詳細： <span style="color: red;">*</span></label>
+                        <textarea id="withdrawReason" rows="4" placeholder="取り下げ理由の詳細を入力してください" style="width: 100%; max-width: 470px; resize: vertical;"></textarea>
+                    </div>
                 </div>
                 <input type="hidden" id="withdrawRequestId">
                 <button type="button" onclick="confirmWithdrawVacation()">取り下げ</button>
                 <button type="button" onclick="closeWithdrawVacationModal()">戻る</button>
                 <div id="withdrawMessage" style="margin-top: 10px;"></div>
+            </div>
+        </div>
+
+        <!-- 休暇承認モーダル -->
+        <div id="approveVacationModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeApproveVacationModal()">&times;</span>
+                <h2>休暇申請承認</h2>
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-weight: bold; display: inline;">開始日：</label>
+                        <span id="approveStartDate"></span>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-weight: bold; display: inline;">終了日：</label>
+                        <span id="approveEndDate"></span>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-weight: bold; display: inline;">休暇種別：</label>
+                        <span id="approveVacationType"></span>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-weight: bold; display: inline;">時間区分：</label>
+                        <span id="approveTimeType"></span>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-weight: bold; display: inline;">ステータス：</label>
+                        <span id="approveStatus"></span>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-weight: bold; display: inline;">休暇理由：</label>
+                        <span id="approveVacationReason"></span>
+                    </div>
+                </div>
+                <input type="hidden" id="approveRequestId">
+                <button type="button" onclick="confirmApproveVacation()">承認</button>
+                <button type="button" onclick="closeApproveVacationModal()">戻る</button>
+                <div id="approveMessage" style="margin-top: 10px;"></div>
             </div>
         </div>
     </div>
@@ -696,7 +779,8 @@
                     const kanaDisplay = emp.kana_name ? ` (${emp.kana_name})` : '';
                     return `
                     <div class="employee-card">
-                        <h4>${emp.name}${kanaDisplay} (ID: ${emp.employee_id})</h4>
+                        <p style="margin: 0 0 5px 0; font-size: 12px; color: #666;">従業員ID：${emp.employee_id}</p>
+                        <h4 style="margin: 0 0 10px 0;">${emp.name}${kanaDisplay}</h4>
                         <p><strong>電話:</strong> ${emp.phone || '未設定'}</p>
                         <p><strong>メール:</strong> ${emp.email || '未設定'}</p>
                         <p><strong>有給日数:</strong> ${emp.vacation_days || 20}日</p>
@@ -721,12 +805,27 @@
 
         // 従業員編集
         function editEmployee(employeeId) {
+            // スピナーを表示し、フォームを非表示
+            const spinner = document.getElementById('employeeFormSpinner');
+            const form = document.getElementById('employeeForm');
+            spinner.style.display = 'block';
+            form.style.display = 'none';
+            
+            // モーダルを開く
+            document.getElementById('modalTitle').textContent = '従業員編集';
+            document.getElementById('employeeModal').style.display = 'block';
+            
             // 実際の実装では、APIから従業員詳細を取得
             fetch(`${API_BASE}/employees/${employeeId}`)
                 .then(response => response.json())
                 .then(async emp => {
                     document.getElementById('employeeId').value = emp.employee_id;
                     document.getElementById('empId').value = emp.employee_id;
+                    
+                    // 従業員IDを表示
+                    document.getElementById('empIdText').textContent = emp.employee_id;
+                    document.getElementById('empIdDisplay').style.display = 'block';
+                    
                     document.getElementById('empName').value = emp.name;
                     document.getElementById('empKanaName').value = emp.kana_name || '';
                     document.getElementById('empPhone').value = emp.phone || '';
@@ -746,11 +845,17 @@
                         cb.checked = emp.skills && emp.skills.includes(cb.value);
                     });
                     
-                    document.getElementById('modalTitle').textContent = '従業員編集';
                     document.getElementById('submitBtn').textContent = '更新';
-                    document.getElementById('employeeModal').style.display = 'block';
+                    
+                    // スピナーを非表示し、フォームを表示
+                    spinner.style.display = 'none';
+                    form.style.display = 'block';
                 })
-                .catch(error => showMessage('formMessage', 'error', `エラー: ${error.message}`));
+                .catch(error => {
+                    spinner.style.display = 'none';
+                    form.style.display = 'block';
+                    showMessage('formMessage', 'error', `エラー: ${error.message}`);
+                });
         }
 
         // 従業員削除
@@ -834,14 +939,17 @@
                 return;
             }
             
+            // スピナーを表示
+            const spinner = document.getElementById('vacationTypeSpinner');
+            const messageDiv = document.getElementById('vacationTypeFormMessage');
+            spinner.style.display = 'block';
+            messageDiv.innerHTML = '';
+            
             // カスタム休暇種別リストに追加
             const container = document.getElementById('customVacationTypes');
             const newItem = document.createElement('div');
             newItem.className = 'form-group';
             newItem.style = 'padding: 15px; background: #f8f9fa; border-radius: 5px; margin-bottom: 10px;';
-            
-            // ユニークなIDを生成（タイムスタンプを使用）
-            const uniqueId = Date.now();
             
             let html = `<div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="flex: 1;">
@@ -865,16 +973,18 @@
             newItem.innerHTML = html;
             container.appendChild(newItem);
             
-            closeVacationTypeModal();
-            
-            // スピナーを表示
-            document.getElementById('vacationTypeSpinner').style.display = 'block';
-            
-            // 少し待ってからメッセージを表示してスピナーを非表示
-            setTimeout(() => {
-                document.getElementById('vacationTypeSpinner').style.display = 'none';
-                showMessage('vacationDefaultMessage', 'success', `✓ ${name}を追加しました。「保存」ボタンを押して確定してください。`);
-            }, 500);
+            // 即座にサーバーに保存
+            try {
+                await saveAllVacationDefaults();
+                spinner.style.display = 'none';
+                closeVacationTypeModal();
+                showMessage('vacationDefaultMessage', 'success', `✓ ${name}を追加しました。`);
+            } catch (error) {
+                // エラーが発生した場合は追加したDOM要素を削除
+                newItem.remove();
+                spinner.style.display = 'none';
+                showMessage('vacationTypeFormMessage', 'error', `エラー: ${error.message}`);
+            }
         });
 
         // カスタム休暇種別の削除
@@ -919,9 +1029,13 @@
             const messageDiv = document.getElementById('vacationDefaultMessage');
             
             // スピナー表示
-            button.style.display = 'none';
-            spinner.style.display = 'block';
-            messageDiv.innerHTML = '';
+            if (button && spinner) {
+                button.style.display = 'none';
+                spinner.style.display = 'block';
+            }
+            if (messageDiv) {
+                messageDiv.innerHTML = '';
+            }
 
             try {
                 const response = await fetch(`${API_BASE}/settings/vacation-default`, {
@@ -937,15 +1051,22 @@
                 });
                 
                 if (response.ok) {
-                    showMessage('vacationDefaultMessage', 'success', '✓ 設定を変更しました。');
+                    if (messageDiv) {
+                        showMessage('vacationDefaultMessage', 'success', '✓ 設定を変更しました。');
+                    }
                 } else {
                     throw new Error('設定に失敗しました');
                 }
             } catch (error) {
-                showMessage('vacationDefaultMessage', 'error', `エラー: ${error.message}`);
+                if (messageDiv) {
+                    showMessage('vacationDefaultMessage', 'error', `エラー: ${error.message}`);
+                }
+                throw error; // エラーを再スローして呼び出し側でキャッチできるようにする
             } finally {
-                button.style.display = 'inline-block';
-                spinner.style.display = 'none';
+                if (button && spinner) {
+                    button.style.display = 'inline-block';
+                    spinner.style.display = 'none';
+                }
             }
         }
 
@@ -1202,12 +1323,15 @@
                     const statusColor = req.status === 'applying' ? '#fff3cd' : req.status === 'approved' ? '#d4edda' : '#f8d7da';
                     const textColor = req.status === 'applying' ? '#856404' : req.status === 'approved' ? '#155724' : '#721c24';
                     
-                    // 申請中の場合は承認ボタン、承認済の場合は取り下げボタンを表示
+                    // 申請中の場合は承認ボタンと取り下げボタンの両方、承認済の場合は取り下げボタンを表示
                     let actionButton = '-';
                     if (req.status === 'applying') {
-                        actionButton = `<button onclick="approveVacationRequest('${req.request_id}')" style="padding: 5px 15px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">承認</button>`;
+                        actionButton = `
+                            <button onclick="openApproveVacationModal('${req.request_id}', '${req.employee_name}', '${req.start_date || req.date}', '${req.end_date || req.start_date || req.date}', '${vacationType}', '${timeType}', '${statusText}', '${(req.reason || '').replace(/'/g, "\\'")}', '${req.employee_id}')" style="padding: 5px 15px; margin-right: 5px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">承認</button>
+                            <button onclick="openWithdrawVacationModal('${req.request_id}', '${req.employee_name}', '${req.start_date || req.date}', '${req.end_date || req.start_date || req.date}', '${vacationType}', '${timeType}', '${statusText}', '${(req.reason || '').replace(/'/g, "\\'")}', '${req.employee_id}')" style="padding: 5px 15px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">取り下げ</button>
+                        `;
                     } else if (req.status === 'approved') {
-                        actionButton = `<button onclick="openWithdrawVacationModal('${req.request_id}', '${req.start_date || req.date}', '${req.end_date || req.start_date || req.date}', '${vacationType}', '${timeType}', '${statusText}')" style="padding: 5px 15px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">取り下げ</button>`;
+                        actionButton = `<button onclick="openWithdrawVacationModal('${req.request_id}', '${req.employee_name}', '${req.start_date || req.date}', '${req.end_date || req.start_date || req.date}', '${vacationType}', '${timeType}', '${statusText}', '${(req.reason || '').replace(/'/g, "\\'")}', '${req.employee_id}')" style="padding: 5px 15px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">取り下げ</button>`;
                     }
                     
                     return `
@@ -1223,7 +1347,6 @@
                                 ${statusText}
                             </span>
                         </td>
-                        <td style="padding: 10px;">${req.reason || '-'}</td>
                         <td style="padding: 10px;">${actionButton}</td>
                     </tr>
                     `;
@@ -1264,15 +1387,84 @@
             }
         }
 
+        // 休暇承認モーダルを開く
+        function openApproveVacationModal(requestId, employeeName, startDate, endDate, vacationType, timeType, status, reason, employeeId) {
+            document.getElementById('approveRequestId').value = requestId;
+            document.getElementById('approveStartDate').textContent = startDate;
+            document.getElementById('approveEndDate').textContent = endDate;
+            document.getElementById('approveVacationType').textContent = vacationType;
+            document.getElementById('approveTimeType').textContent = timeType;
+            document.getElementById('approveStatus').textContent = status;
+            document.getElementById('approveVacationReason').textContent = reason || '-';
+            document.getElementById('approveMessage').innerHTML = '';
+            document.getElementById('approveVacationModal').style.display = 'block';
+        }
+
+        // 休暇承認モーダルを閉じる
+        function closeApproveVacationModal() {
+            document.getElementById('approveVacationModal').style.display = 'none';
+        }
+
+        // 休暇承認を確認して実行
+        async function confirmApproveVacation() {
+            if (!confirm('承認しますか？')) {
+                return;
+            }
+
+            const requestId = document.getElementById('approveRequestId').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/vacation-requests/${requestId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'approved' })
+                });
+
+                if (response.ok) {
+                    closeApproveVacationModal();
+                    alert('✓ 休暇申請を承認しました。');
+                    loadAllVacationRequests(); // 一覧を再読み込み
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '承認に失敗しました');
+                }
+            } catch (error) {
+                showMessage('approveMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
         // 休暇取り下げモーダルを開く
-        function openWithdrawVacationModal(requestId, startDate, endDate, vacationType, timeType, status) {
+        // 休暇取り下げ理由タイプの変更処理
+        function handleWithdrawReasonTypeChange() {
+            const selectedType = document.querySelector('input[name="withdrawReasonType"]:checked').value;
+            const textContainer = document.getElementById('withdrawReasonTextContainer');
+            const textarea = document.getElementById('withdrawReason');
+            
+            if (selectedType === 'その他') {
+                textContainer.style.display = 'block';
+                textarea.value = '';
+            } else {
+                textContainer.style.display = 'none';
+                textarea.value = '';
+            }
+        }
+
+        function openWithdrawVacationModal(requestId, employeeName, startDate, endDate, vacationType, timeType, status, reason, employeeId) {
             document.getElementById('withdrawRequestId').value = requestId;
             document.getElementById('withdrawStartDate').textContent = startDate;
             document.getElementById('withdrawEndDate').textContent = endDate;
             document.getElementById('withdrawVacationType').textContent = vacationType;
             document.getElementById('withdrawTimeType').textContent = timeType;
             document.getElementById('withdrawStatus').textContent = status;
+            document.getElementById('withdrawVacationReason').textContent = reason || '-';
+            
+            // ラジオボタンを初期化（申請誤りを選択）
+            const radioButtons = document.querySelectorAll('input[name="withdrawReasonType"]');
+            radioButtons[0].checked = true;
+            
+            // テキストエリアとコンテナを初期化
             document.getElementById('withdrawReason').value = '';
+            document.getElementById('withdrawReasonTextContainer').style.display = 'none';
             document.getElementById('withdrawMessage').innerHTML = '';
             document.getElementById('withdrawVacationModal').style.display = 'block';
         }
@@ -1284,10 +1476,17 @@
 
         // 休暇取り下げを確認して実行
         async function confirmWithdrawVacation() {
-            const reason = document.getElementById('withdrawReason').value.trim();
-            if (!reason) {
-                showMessage('withdrawMessage', 'error', '取り下げ理由を入力してください');
-                return;
+            const reasonType = document.querySelector('input[name="withdrawReasonType"]:checked').value;
+            let reason = reasonType;
+            
+            // 「その他」の場合は詳細テキストをチェック
+            if (reasonType === 'その他') {
+                const reasonDetail = document.getElementById('withdrawReason').value.trim();
+                if (!reasonDetail) {
+                    showMessage('withdrawMessage', 'error', '取り下げ理由の詳細を入力してください');
+                    return;
+                }
+                reason = `${reasonType}：${reasonDetail}`;
             }
 
             if (!confirm('取り下げますか？')) {

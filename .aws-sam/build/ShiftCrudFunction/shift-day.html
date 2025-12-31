@@ -50,6 +50,19 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        /* datalistのドロップダウンの高さを制限 */
+        input[list]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+        }
+        input[list] {
+            position: relative;
+        }
+        /* Chrome/Edge用 - datalistのドロップダウンサイズ制限 */
+        @supports (-webkit-appearance: none) {
+            input[list]::-webkit-list-button {
+                height: 150px;
+            }
+        }
     </style>
 </head>
 <body>

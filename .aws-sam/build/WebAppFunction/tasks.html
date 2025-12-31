@@ -195,10 +195,12 @@
             z-index: 1000;
             inset: 0;
             background-color: rgba(0,0,0,0.5);
-            display: flex;
             align-items: center;
             justify-content: center;
             padding: 16px;
+        }
+        .modal[style*="display: block"] {
+            display: flex;
         }
         .modal-content {
             background-color: white;
@@ -254,6 +256,19 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        /* datalistのドロップダウンの高さを制限 */
+        input[list]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+        }
+        input[list] {
+            position: relative;
+        }
+        /* Chrome/Edge用 - datalistのドロップダウンサイズ制限 */
+        @supports (-webkit-appearance: none) {
+            input[list]::-webkit-list-button {
+                height: 150px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -265,7 +280,7 @@
 
         <div class="section">
             <h2>作業種別一覧</h2>
-            <button id="addTaskListBtn" onclick="openTaskModalForAdd()">追加</button>
+            <button id="addTaskListBtn" onclick="openTaskModalForAdd()">作業種別追加</button>
             <div id="taskListLoadingContainer" style="display: none; padding: 20px 0; color: #666;">
                 <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
                 <span>読み込み中...</span>
@@ -275,25 +290,38 @@
 
         <div class="section">
             <h2>作業人数・作業時間（規定値）</h2>
+            <div id="requirementsLoadingContainer" style="display: none; color: #666; margin-top: 10px; margin-bottom: 20px;">
+                <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                <span>読み込み中…</span>
+            </div>
+            <div id="requirementsContent" style="display: none;">
             
             <!-- 午前シフト -->
             <h3>午前シフト</h3>
             <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6;">
-                <label style="font-weight: bold; margin-right: 10px;">午前シフト時間（規定値）:</label>
-                <select id="morningShiftStartHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
-                <span>:</span>
-                <select id="morningShiftStartMinute" style="margin-right: 5px; width: 60px; text-align: center;"></select>
-                <span style="margin: 0 5px;">～</span>
-                <select id="morningShiftEndHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
-                <span>:</span>
-                <select id="morningShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;"></select>
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <label style="font-weight: bold; margin-right: 10px; white-space: nowrap;">午前シフト時間（規定値）：</label>
+                    <select id="morningShiftStartHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
+                    <span>:</span>
+                    <select id="morningShiftStartMinute" style="margin-right: 5px; width: 60px; text-align: center;"></select>
+                    <span style="margin: 0 5px;">～</span>
+                    <select id="morningShiftEndHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
+                    <span>:</span>
+                    <select id="morningShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;"></select>
+                </div>
+                <div>
+                    <button onclick="applyMorningDefaultTime()" style="padding: 8px 16px;">一括設定</button>
+                </div>
+                <div id="morningBulkMessage" style="margin-top: 10px; padding: 10px; border-radius: 5px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; font-size: 14px; display: none;">
+                    ※作業時間を反映させるには保存ボタンを押してください
+                </div>
             </div>
             <p style="color: #666; font-size: 14px; margin: 0 0 15px 0;">※各作業種別の作業時間（午前）の初期値となります</p>
             <div id="morningRequirements"></div>
             <div id="morningValidation" style="margin-top: 10px;"></div>
             
             <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
-                <button id="saveMorningRequirementsBtn" onclick="saveMorningRequirements()">保存</button>
+                <button id="saveMorningRequirementsBtn" onclick="saveMorningRequirements()" style="padding: 8px 16px;">保存</button>
                 <div id="morningSaveSpinner" style="display: none;">
                     <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
                     <span style="font-size: 14px; color: #666;">更新中</span>
@@ -304,31 +332,40 @@
             <!-- 午後シフト -->
             <h3>午後シフト</h3>
             <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6;">
-                <label style="font-weight: bold; margin-right: 10px;">午後シフト時間（規定値）:</label>
-                <select id="afternoonShiftStartHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
-                <span>:</span>
-                <select id="afternoonShiftStartMinute" style="margin-right: 5px; width: 60px; text-align: center;"></select>
-                <span style="margin: 0 5px;">～</span>
-                <select id="afternoonShiftEndHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
-                <span>:</span>
-                <select id="afternoonShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;"></select>
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <label style="font-weight: bold; margin-right: 10px; white-space: nowrap;">午後シフト時間（規定値）：</label>
+                    <select id="afternoonShiftStartHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
+                    <span>:</span>
+                    <select id="afternoonShiftStartMinute" style="margin-right: 5px; width: 60px; text-align: center;"></select>
+                    <span style="margin: 0 5px;">～</span>
+                    <select id="afternoonShiftEndHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
+                    <span>:</span>
+                    <select id="afternoonShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;"></select>
+                </div>
+                <div>
+                    <button onclick="applyAfternoonDefaultTime()" style="padding: 8px 16px;">一括設定</button>
+                </div>
+                <div id="afternoonBulkMessage" style="margin-top: 10px; padding: 10px; border-radius: 5px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; font-size: 14px; display: none;">
+                    ※作業時間を反映させるには保存ボタンを押してください
+                </div>
             </div>
             <p style="color: #666; font-size: 14px; margin: 0 0 15px 0;">※各作業種別の作業時間（午後）の初期値となります</p>
             <div id="afternoonRequirements"></div>
             <div id="afternoonValidation" style="margin-top: 10px;"></div>
             
             <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
-                <button id="saveAfternoonRequirementsBtn" onclick="saveAfternoonRequirements()">保存</button>
+                <button id="saveAfternoonRequirementsBtn" onclick="saveAfternoonRequirements()" style="padding: 8px 16px;">保存</button>
                 <div id="afternoonSaveSpinner" style="display: none;">
                     <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
                     <span style="font-size: 14px; color: #666;">更新中</span>
                 </div>
                 <div id="afternoonRequirementsMessage"></div>
             </div>
+            </div>
         </div>
 
         <!-- Task modal -->
-        <div id="taskModal" class="modal" style="display:none;">
+        <div id="taskModal" class="modal">
             <div class="modal-content">
                 <span class="close" onclick="closeTaskModal()">&times;</span>
                 <h3>作業種別編集</h3>
@@ -350,7 +387,7 @@
                         <label>作業説明:</label>
                         <textarea id="taskDescription" placeholder="作業の詳細説明を入力してください"></textarea>
                     </div>
-                    <button type="submit" id="submitBtn">登録</button>
+                    <button type="submit" id="submitBtn">追加</button>
                     <button type="button" id="cancelModalBtn" onclick="closeTaskModal()">戻る</button>
                 </form>
                 <div id="formMessage"></div>
@@ -900,6 +937,12 @@
 
         // グローバルデフォルト人数設定読み込み
         async function loadGlobalDefaultRequirements() {
+            // スピナーを表示
+            const loadingContainer = document.getElementById('requirementsLoadingContainer');
+            const content = document.getElementById('requirementsContent');
+            if (loadingContainer) loadingContainer.style.display = 'block';
+            if (content) content.style.display = 'none';
+            
             try {
                 const tasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
                 
@@ -957,7 +1000,7 @@
                         <div>人数</div>
                         <div></div>
                         <div></div>
-                        <div style="grid-column: span 8; text-align: center;">作業時間（午前）</div>
+                        <div style="grid-column: 5 / 12; text-align: center;">作業時間（午前）</div>
                     </div>
                 `;
                 morningHTML += tasks.map((task, index) => `
@@ -1005,7 +1048,7 @@
                         <div>人数</div>
                         <div></div>
                         <div></div>
-                        <div style="grid-column: span 8; text-align: center;">作業時間（午後）</div>
+                        <div style="grid-column: 5 / 12; text-align: center;">作業時間（午後）</div>
                     </div>
                 `;
                 afternoonHTML += tasks.map((task, index) => `
@@ -1047,12 +1090,24 @@
                 
                 // 初期表示時にもチェック
                 validateTotalRequirements();
+                
+                // スピナーを非表示し、コンテンツを表示
+                const loadingContainer = document.getElementById('requirementsLoadingContainer');
+                const content = document.getElementById('requirementsContent');
+                if (loadingContainer) loadingContainer.style.display = 'none';
+                if (content) content.style.display = 'block';
             } catch (error) {
                 console.error('人数設定読み込みエラー:', error);
                 const morningContainer = document.getElementById('morningRequirements');
                 const afternoonContainer = document.getElementById('afternoonRequirements');
                 if (morningContainer) morningContainer.innerHTML = '<p>データの読み込みに失敗しました</p>';
                 if (afternoonContainer) afternoonContainer.innerHTML = '<p>データの読み込みに失敗しました</p>';
+                
+                // エラー時もスピナーを非表示
+                const loadingContainer = document.getElementById('requirementsLoadingContainer');
+                const content = document.getElementById('requirementsContent');
+                if (loadingContainer) loadingContainer.style.display = 'none';
+                if (content) content.style.display = 'block';
             }
         }
 
@@ -1154,6 +1209,70 @@
             
             // 合計人数のバリデーションも実行
             validateTotalRequirements();
+        }
+
+        // 午前シフト時間を一括設定
+        function applyMorningDefaultTime() {
+            if (!confirm('午前シフト時間（規定値）を全ての作業種別の作業時間（午前）に一括設定しますか？')) {
+                return;
+            }
+            
+            const startHour = document.getElementById('morningShiftStartHour').value;
+            const startMinute = document.getElementById('morningShiftStartMinute').value;
+            const endHour = document.getElementById('morningShiftEndHour').value;
+            const endMinute = document.getElementById('morningShiftEndMinute').value;
+            
+            // 午前シフトの全ての時間selectを設定
+            document.querySelectorAll('#morningRequirements select[data-field="morning_start_hour"]').forEach(select => {
+                select.value = startHour;
+            });
+            document.querySelectorAll('#morningRequirements select[data-field="morning_start_minute"]').forEach(select => {
+                select.value = startMinute;
+            });
+            document.querySelectorAll('#morningRequirements select[data-field="morning_end_hour"]').forEach(select => {
+                select.value = endHour;
+            });
+            document.querySelectorAll('#morningRequirements select[data-field="morning_end_minute"]').forEach(select => {
+                select.value = endMinute;
+            });
+            
+            // メッセージを表示
+            const messageDiv = document.getElementById('morningBulkMessage');
+            if (messageDiv) {
+                messageDiv.style.display = 'block';
+            }
+        }
+
+        // 午後シフト時間を一括設定
+        function applyAfternoonDefaultTime() {
+            if (!confirm('午後シフト時間（規定値）を全ての作業種別の作業時間（午後）に一括設定しますか？')) {
+                return;
+            }
+            
+            const startHour = document.getElementById('afternoonShiftStartHour').value;
+            const startMinute = document.getElementById('afternoonShiftStartMinute').value;
+            const endHour = document.getElementById('afternoonShiftEndHour').value;
+            const endMinute = document.getElementById('afternoonShiftEndMinute').value;
+            
+            // 午後シフトの全ての時間selectを設定
+            document.querySelectorAll('#afternoonRequirements select[data-field="afternoon_start_hour"]').forEach(select => {
+                select.value = startHour;
+            });
+            document.querySelectorAll('#afternoonRequirements select[data-field="afternoon_start_minute"]').forEach(select => {
+                select.value = startMinute;
+            });
+            document.querySelectorAll('#afternoonRequirements select[data-field="afternoon_end_hour"]').forEach(select => {
+                select.value = endHour;
+            });
+            document.querySelectorAll('#afternoonRequirements select[data-field="afternoon_end_minute"]').forEach(select => {
+                select.value = endMinute;
+            });
+            
+            // メッセージを表示
+            const messageDiv = document.getElementById('afternoonBulkMessage');
+            if (messageDiv) {
+                messageDiv.style.display = 'block';
+            }
         }
 
         // 午前シフト人数設定保存
