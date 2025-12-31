@@ -278,7 +278,9 @@ def get_vacation_default():
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
                 'body': json.dumps({
-                    'default_vacation_days': int(response['Item'].get('default_vacation_days', 20))
+                    'default_vacation_days': int(response['Item'].get('default_vacation_days', 20)),
+                    'annual_vacation_days': int(response['Item'].get('annual_vacation_days', 0)),
+                    'monthly_vacation_limit': int(response['Item'].get('monthly_vacation_limit', 0))
                 })
             }
         else:
@@ -286,7 +288,11 @@ def get_vacation_default():
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps({'default_vacation_days': 20})
+                'body': json.dumps({
+                    'default_vacation_days': 20,
+                    'annual_vacation_days': 0,
+                    'monthly_vacation_limit': 0
+                })
             }
     except Exception as e:
         print(f"Error in get_vacation_default: {str(e)}")
@@ -294,7 +300,11 @@ def get_vacation_default():
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'default_vacation_days': 20})
+            'body': json.dumps({
+                'default_vacation_days': 20,
+                'annual_vacation_days': 0,
+                'monthly_vacation_limit': 0
+            })
         }
 
 def save_vacation_default(event):
@@ -305,7 +315,9 @@ def save_vacation_default(event):
         item = {
             'PK': 'SETTINGS',
             'SK': 'VACATION_DEFAULT',
-            'default_vacation_days': int(data['default_vacation_days'])
+            'default_vacation_days': int(data.get('default_vacation_days', 20)),
+            'annual_vacation_days': int(data.get('annual_vacation_days', 0)),
+            'monthly_vacation_limit': int(data.get('monthly_vacation_limit', 0))
         }
         
         table.put_item(Item=item)

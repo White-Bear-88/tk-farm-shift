@@ -319,6 +319,41 @@ Resources:
             Path: /settings/vacation-default
             Method: ANY
 
+  VacationManagementFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'dairy-vacation-management-${Environment}'
+      CodeUri: src/
+      Handler: vacation_management.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ShiftManagementTable
+      Events:
+        VacationRequestsList:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /vacation-requests
+            Method: GET
+        VacationRequestsCreate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /vacation-requests
+            Method: POST
+        VacationRequestsUpdate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /vacation-requests/{request_id}
+            Method: PUT
+        VacationRequestsDelete:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /vacation-requests/{request_id}
+            Method: DELETE
+
 Outputs:
   WebAppUrl:
     Description: 'Web Application URL'

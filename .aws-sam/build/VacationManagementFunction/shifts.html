@@ -1,0 +1,2119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シフト管理 - 酪農シフト管理システム</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .back-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .back-btn:hover {
+            background: #0056b3;
+        }
+        .section {
+            background: white;
+            margin: 20px 0;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            text-align: center;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .btn-success {
+            background: #28a745;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .btn-success:disabled {
+            background: #6c757d;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .btn-danger:disabled {
+            background: #6c757d;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .modal-buttons button {
+            margin-right: 0;
+        }
+        .shift-calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .calendar-day {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            min-height: 150px;
+            border: 2px solid transparent;
+        }
+        .calendar-day.selected {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        .calendar-day h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+            text-align: center;
+        }
+        .shift-item {
+            background: white;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 3px solid #28a745;
+            font-size: 12px;
+        }
+        .shift-item.morning {
+            background: #e8f5e9;
+            border-left: 3px solid #28a745;
+        }
+        .shift-item.afternoon {
+            background: #fff3e0;
+            border-left: 3px solid #ff8c00;
+        }
+        .calendar-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .shift-calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .calendar-header {
+            background: #1976d2;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .calendar-day {
+            background: white;
+            min-height: 120px;
+            padding: 8px;
+            position: relative;
+        }
+        .calendar-day.other-month {
+            background: #f9f9f9;
+            color: #999;
+        }
+        .calendar-day.today {
+            background: #fff3e0;
+            border: 2px solid #ff9800;
+        }
+        .day-number {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .shift-assignment {
+            font-size: 11px;
+            background: #2196f3;
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin: 1px 0;
+            display: block;
+        }
+        .shift-assignment.morning {
+            background: #4caf50;
+        }
+        .shift-assignment.afternoon {
+            background: #ff9800;
+        }
+        .shift-assignment.preview {
+            opacity: 0.8;
+            border: 1px dashed #333;
+        }
+        .shift-assignment.vacation-conflict {
+            background: #ff5722;
+            color: white;
+        }
+        .auto-generate-compact {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: #e8f5e8;
+            border-radius: 8px;
+            border: 1px solid #c3e6cb;
+        }
+        .auto-generate-compact label {
+            margin: 0;
+            font-weight: bold;
+        }
+        .auto-generate-compact input {
+            width: 150px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            inset: 0;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal.is-open {
+            display: flex;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 0;
+            padding: 20px;
+            border-radius: 10px;
+            width: 480px;
+            max-width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: black;
+        }
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        /* ローディングコンテナ */
+        .loading-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            text-align: center;
+        }
+        .spinner-loader {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            margin-bottom: 20px;
+        }
+        .spinner {
+            width: 100%;
+            height: 100%;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-text {
+            font-size: 16px;
+            color: #666;
+            margin-top: 10px;
+        }
+        /* スピナーアニメーション */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* チェックボックスのスタイリング */
+        .shift-checkbox {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            margin: 0;
+            flex-shrink: 0;
+        }
+        #dayShiftsList > div {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        #dayShiftsList > div > div {
+            flex: 1;
+            text-align: left;
+        }
+        .loading-message {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 シフト管理</h1>
+            <a href="admin-menu.html" class="back-btn">← 管理者用メニューに戻る</a>
+        </div>
+
+        <div class="section">
+            <h2>シフト確定日設定</h2>
+            <div class="form-group">
+                <label>翌月シフト確定日:</label>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="number" id="confirmationDay" min="1" max="31" value="25" placeholder="25" style="width: 80px;">
+                    <span>日</span>
+                </div>
+            </div>
+            <p style="color: #666; font-size: 14px;">
+                例: 25日に設定すると、毎月25日に翌月のシフトが確定されます。
+            </p>
+            <button onclick="saveConfirmationSettings()">保存</button>
+            <div id="confirmationMessage"></div>
+        </div>
+
+
+
+        <div class="section">
+            <h2>シフトカレンダー</h2>
+            <div class="calendar-controls">
+                <div class="month-selector">
+                    <label>表示月:</label>
+                    <input type="month" id="calendarMonth" onchange="updateShiftCalendar()">
+                    <span id="pastMonthMessage" style="margin-left: 15px; color: #dc3545; font-size: 14px;"></span>
+                </div>
+                <div class="auto-generate">
+                    <button id="generateMorningBtn" class="btn-success" onclick="generateMonthlyShifts(event, 'morning')" title="選択した月の午前シフトを自動生成します">午前シフト自動生成</button>
+                    <button id="generateAfternoonBtn" class="btn-success" onclick="generateMonthlyShifts(event, 'afternoon')" title="選択した月の午後シフトを自動生成します" style="background: #ff8c00;">午後シフト自動生成</button>
+                </div>
+            </div>
+            <div id="calendarLoadingContainer" class="loading-container" style="display: none;">
+                <div class="spinner-loader">
+                    <div class="spinner"></div>
+                </div>
+                <div class="loading-text">カレンダーを読み込み中...</div>
+            </div>
+            <div class="shift-calendar" id="shiftCalendar"></div>
+            <div id="calendarMessage"></div>
+            <div id="generateMessage"></div>
+        </div>
+    </div>
+
+    <!-- シフト編集モーダル -->
+    <div id="shiftModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeShiftModal()">&times;</span>
+            <h3>シフト編集</h3>
+
+            <!-- 日付表示（編集不可・ダイアログ先頭へ移動） -->
+            <div class="form-group" style="margin-bottom:8px">
+                <label>日付:</label>
+                <div id="shiftDateDisplay" style="font-weight:bold;padding:6px 0"></div>
+                <input type="hidden" id="shiftDate">
+            </div>
+
+            <div id="dayShiftsList" style="margin-bottom:12px"></div>
+
+            <form id="shiftForm">
+                <input type="hidden" id="shiftId">
+
+                <!-- 午前・午後選択 -->
+                <div class="form-group">
+                    <label>シフト時間帯:</label>
+                    <div style="display: flex; gap: 20px; margin-top: 5px;">
+                        <label style="display: flex; align-items: center; font-weight: normal;">
+                            <input type="checkbox" id="morningShift" onchange="updateShiftTimeOptions()" style="margin-right: 5px;">
+                            午前
+                        </label>
+                        <label style="display: flex; align-items: center; font-weight: normal;">
+                            <input type="checkbox" id="afternoonShift" onchange="updateShiftTimeOptions()" style="margin-right: 5px;">
+                            午後
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 午前シフト -->
+                <div id="morningShiftSection" style="display: none; border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; background: #f9f9f9;">
+                    <h4 style="margin: 0 0 10px 0;">午前シフト</h4>
+                    <div class="form-group">
+                        <label>作業種別:</label>
+                        <select id="morningTaskSelect">
+                            <option value="">作業を選択</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>開始時間:</label>
+                            <div style="display: flex; gap: 3px; align-items: center;">
+                                <select id="morningStartHour" style="width: 60px; text-align: center;"></select>
+                                <span>:</span>
+                                <select id="morningStartMinute" style="width: 60px; text-align: center;"></select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>終了時間:</label>
+                            <div style="display: flex; gap: 3px; align-items: center;">
+                                <select id="morningEndHour" style="width: 60px; text-align: center;"></select>
+                                <span>:</span>
+                                <select id="morningEndMinute" style="width: 60px; text-align: center;"></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 午後シフト -->
+                <div id="afternoonShiftSection" style="display: none; border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; background: #f9f9f9;">
+                    <h4 style="margin: 0 0 10px 0;">午後シフト</h4>
+                    <div class="form-group">
+                        <label>作業種別:</label>
+                        <select id="afternoonTaskSelect">
+                            <option value="">作業を選択</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>開始時間:</label>
+                            <div style="display: flex; gap: 3px; align-items: center;">
+                                <select id="afternoonStartHour" style="width: 60px; text-align: center;"></select>
+                                <span>:</span>
+                                <select id="afternoonStartMinute" style="width: 60px; text-align: center;"></select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>終了時間:</label>
+                            <div style="display: flex; gap: 3px; align-items: center;">
+                                <select id="afternoonEndHour" style="width: 60px; text-align: center;"></select>
+                                <span>:</span>
+                                <select id="afternoonEndMinute" style="width: 60px; text-align: center;"></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>従業員:</label>
+                    <select id="employeeSelect" required>
+                        <option value="">従業員を選択</option>
+                    </select>
+                </div>
+                
+                <!-- 旧フィールド（互換性のため非表示） -->
+                <div style="display: none;">
+                    <select id="taskSelect">
+                        <option value="">作業を選択</option>
+                    </select>
+                    <select id="startHour"></select>
+                    <select id="startMinute"></select>
+                    <select id="endHour"></select>
+                    <select id="endMinute"></select>
+                </div>
+                
+                <input type="hidden" id="shiftStatus" value="active">
+                <div class="modal-buttons">
+                    <button id="addBtn" type="submit" class="btn-success">追加</button>
+                    <button id="updateBtn" type="button" onclick="updateShift(event)" disabled>変更</button>
+                    <button id="deleteBtn" type="button" class="btn-danger" onclick="deleteSelectedShifts(event)" disabled>削除</button>
+                    <button id="cancelBtn" type="button" onclick="closeShiftModal()">閉じる</button>
+                </div>
+            </form>
+            <div id="modalMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev';
+        // 従業員ID → 名前 マップ（UI表示用）
+        let employeesMap = {};
+        // プレビュー用の月とシフト配列（確定までDBに書き込まない）
+        let previewMonth = null;
+        let previewShifts = [];
+
+        // ボタンの処理中状態を管理
+        function setButtonLoading(button, loading) {
+            if (loading) {
+                button.disabled = true;
+                button.style.opacity = '0.6';
+            } else {
+                button.disabled = false;
+                button.style.opacity = '1';
+            }
+        }
+
+        // シフト確定日設定保存
+        async function saveConfirmationSettings() {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '🔄 更新中...';
+            setButtonLoading(button, true);
+            
+            const day = parseInt(document.getElementById('confirmationDay').value);
+            
+            if (!day || day < 1 || day > 31) {
+                showMessage('confirmationMessage', 'error', '有効な日付を入力してください（1-31）');
+                setButtonLoading(button, false);
+                return;
+            }
+
+            const data = {
+                confirmation_day: day
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/settings/confirmation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    showMessage('confirmationMessage', 'success', '✓ シフト確定日を更新しました');
+                    setTimeout(() => {
+                        document.getElementById('confirmationMessage').innerHTML = '';
+                    }, 3000);
+                } else {
+                    throw new Error('設定に失敗しました');
+                }
+            } catch (error) {
+                showMessage('confirmationMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                button.textContent = originalText;
+                setButtonLoading(button, false);
+            }
+        }
+
+        // シフト確定日設定読み込み
+        async function loadConfirmationSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/settings/confirmation`);
+                if (response.ok) {
+                    const settings = await response.json();
+                    document.getElementById('confirmationDay').value = settings.confirmation_day || 25;
+                } else {
+                    document.getElementById('confirmationDay').value = 25;
+                }
+            } catch (error) {
+                console.log('確定日設定なし、デフォルト値使用');
+                document.getElementById('confirmationDay').value = 25;
+            }
+        }
+
+        function showMessage(elementId, type, message) {
+            const messageDiv = document.getElementById(elementId);
+            messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
+            setTimeout(() => messageDiv.innerHTML = '', 5000);
+        }
+
+
+        // シフト確定日設定保存
+        async function saveConfirmationSettings() {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '🔄 更新中...';
+            setButtonLoading(button, true);
+            
+            const day = parseInt(document.getElementById('confirmationDay').value);
+            
+            if (!day || day < 1 || day > 31) {
+                showMessage('confirmationMessage', 'error', '有効な日付を入力してください（1-31）');
+                setButtonLoading(button, false);
+                return;
+            }
+
+            const data = {
+                confirmation_day: day
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/settings/confirmation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    showMessage('confirmationMessage', 'success', '✓ シフト確定日を更新しました');
+                    setTimeout(() => {
+                        document.getElementById('confirmationMessage').innerHTML = '';
+                    }, 3000);
+                } else {
+                    throw new Error('設定に失敗しました');
+                }
+            } catch (error) {
+                showMessage('confirmationMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                button.textContent = originalText;
+                setButtonLoading(button, false);
+            }
+        }
+
+        // シフト確定日設定読み込み
+        async function loadConfirmationSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/settings/confirmation`);
+                if (response.ok) {
+                    const settings = await response.json();
+                    document.getElementById('confirmationDay').value = settings.confirmation_day || 25;
+                } else {
+                    document.getElementById('confirmationDay').value = 25;
+                }
+            } catch (error) {
+                console.log('確定日設定なし、デフォルト値使用');
+                document.getElementById('confirmationDay').value = 25;
+            }
+        }
+
+        function showMessage(elementId, type, message) {
+            const messageDiv = document.getElementById(elementId);
+            messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
+            setTimeout(() => messageDiv.innerHTML = '', 5000);
+        }
+
+        // 時間の選択肢を生成（00〜23）
+        function generateHourOptions() {
+            const options = [];
+            for (let h = 0; h < 24; h++) {
+                options.push(String(h).padStart(2, '0'));
+            }
+            return options;
+        }
+
+        // 分の選択肢を生成（5分刻み）
+        function generateMinuteOptions() {
+            const options = [];
+            for (let m = 0; m < 60; m += 5) {
+                options.push(String(m).padStart(2, '0'));
+            }
+            return options;
+        }
+
+        // selectに時間オプションを追加
+        function populateHourSelect(selectElement, selectedValue = '') {
+            if (!selectElement) return;
+            selectElement.innerHTML = '';
+            const options = generateHourOptions();
+            options.forEach(hour => {
+                const option = document.createElement('option');
+                option.value = hour;
+                option.textContent = hour;
+                if (hour === selectedValue) {
+                    option.selected = true;
+                }
+                selectElement.appendChild(option);
+            });
+        }
+
+        // selectに分オプションを追加（5分刻み）
+        function populateMinuteSelect(selectElement, selectedValue = '') {
+            if (!selectElement) return;
+            selectElement.innerHTML = '';
+            const options = generateMinuteOptions();
+            options.forEach(minute => {
+                const option = document.createElement('option');
+                option.value = minute;
+                option.textContent = minute;
+                if (minute === selectedValue) {
+                    option.selected = true;
+                }
+                selectElement.appendChild(option);
+            });
+        }
+
+        // 時間入力のバリデーション
+        function validateHourInput(input) {
+            const value = input.value.trim();
+            
+            // 空の場合はOK
+            if (value === '') return true;
+            
+            // 数字以外が含まれている場合
+            if (!/^\d+$/.test(value)) {
+                alert('時間は数字のみ入力してください');
+                input.value = '';
+                input.focus();
+                return false;
+            }
+            
+            const hour = parseInt(value, 10);
+            
+            // 範囲外の場合
+            if (hour < 0 || hour > 23) {
+                alert('時間は0から23の範囲で入力してください');
+                input.value = '';
+                input.focus();
+                return false;
+            }
+            
+            // 正しい形式に補正
+            input.value = String(hour).padStart(2, '0');
+            
+            // datalistを再生成して全ての候補を表示可能にする
+            refreshDatalist(input, generateHourOptions());
+            
+            return true;
+        }
+
+        // 分入力のバリデーションと5分刻みへの補正
+        function validateMinuteInput(input) {
+            const value = input.value.trim();
+            
+            // 空の場合はOK
+            if (value === '') return true;
+            
+            // 数字以外が含まれている場合
+            if (!/^\d+$/.test(value)) {
+                alert('分は数字のみ入力してください');
+                input.value = '';
+                input.focus();
+                return false;
+            }
+            
+            const minute = parseInt(value, 10);
+            
+            // 範囲外の場合
+            if (minute < 0 || minute > 59) {
+                alert('分は0から59の範囲で入力してください');
+                input.value = '';
+                input.focus();
+                return false;
+            }
+            
+            // 5分刻みに補正
+            const correctedMinute = Math.round(minute / 5) * 5;
+            input.value = String(correctedMinute === 60 ? 0 : correctedMinute).padStart(2, '0');
+            
+            // datalistを再生成して全ての候補を表示可能にする
+            refreshDatalist(input, generateMinuteOptions());
+            
+            return true;
+        }
+
+        // input要素に時間オプションをdatalistで設定
+        function setupHourInput(inputElement, selectedValue = '') {
+            const datalistId = inputElement.id + '_datalist';
+            let datalist = document.getElementById(datalistId);
+            
+            if (!datalist) {
+                datalist = document.createElement('datalist');
+                datalist.id = datalistId;
+                inputElement.setAttribute('list', datalistId);
+                document.body.appendChild(datalist);
+            }
+            
+            datalist.innerHTML = '';
+            const options = generateHourOptions();
+            options.forEach(hour => {
+                const option = document.createElement('option');
+                option.value = hour;
+                datalist.appendChild(option);
+            });
+            
+            if (selectedValue !== '') {
+                inputElement.value = selectedValue;
+            }
+            
+            // プルダウン表示を促進するイベントリスナー
+            inputElement.removeEventListener('click', showDatalistOptions);
+            inputElement.addEventListener('click', showDatalistOptions);
+            inputElement.removeEventListener('focus', showDatalistOptions);
+            inputElement.addEventListener('focus', showDatalistOptions);
+            
+            // バリデーション設定
+            inputElement.removeEventListener('blur', hourBlurHandler);
+            inputElement.addEventListener('blur', hourBlurHandler);
+        }
+
+        function hourBlurHandler(e) {
+            validateHourInput(e.target);
+        }
+
+        // input要素に分オプションをdatalistで設定
+        function setupMinuteInput(inputElement, selectedValue = '') {
+            const datalistId = inputElement.id + '_datalist';
+            let datalist = document.getElementById(datalistId);
+            
+            if (!datalist) {
+                datalist = document.createElement('datalist');
+                datalist.id = datalistId;
+                inputElement.setAttribute('list', datalistId);
+                document.body.appendChild(datalist);
+            }
+            
+            datalist.innerHTML = '';
+            const options = generateMinuteOptions();
+            options.forEach(minute => {
+                const option = document.createElement('option');
+                option.value = minute;
+                datalist.appendChild(option);
+            });
+            
+            if (selectedValue !== '') {
+                inputElement.value = selectedValue;
+            }
+            
+            // プルダウン表示を促進するイベントリスナー
+            inputElement.removeEventListener('click', showDatalistOptions);
+            inputElement.addEventListener('click', showDatalistOptions);
+            inputElement.removeEventListener('focus', showDatalistOptions);
+            inputElement.addEventListener('focus', showDatalistOptions);
+            
+            // バリデーション設定
+            inputElement.removeEventListener('blur', minuteBlurHandler);
+            inputElement.addEventListener('blur', minuteBlurHandler);
+        }
+
+        function minuteBlurHandler(e) {
+            validateMinuteInput(e.target);
+        }
+
+        // datalistのプルダウンを表示するためのヘルパー関数
+        function showDatalistOptions(e) {
+            const input = e.target;
+            
+            // フォーカス時に全選択することでプルダウンを表示
+            setTimeout(() => {
+                input.select();
+            }, 0);
+            
+            // ブラウザがshowPickerをサポートしている場合
+            if (input.showPicker && typeof input.showPicker === 'function') {
+                try {
+                    input.showPicker();
+                } catch (e) {
+                    // showPickerが失敗しても無視
+                }
+            }
+        }
+
+        // datalistを再生成する（キーボード入力後も全候補を表示可能にする）
+        function refreshDatalist(inputElement, options) {
+            const datalistId = inputElement.getAttribute('list');
+            if (!datalistId) return;
+            
+            let datalist = document.getElementById(datalistId);
+            if (!datalist) return;
+            
+            // datalistの内容を再生成
+            datalist.innerHTML = '';
+            options.forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                datalist.appendChild(option);
+            });
+        }
+
+        // 時間文字列（HH:MM）から時と分を分離してselectに設定
+        function setTimeSelects(hourSelectId, minuteSelectId, timeValue) {
+            const hourSelect = document.getElementById(hourSelectId);
+            const minuteSelect = document.getElementById(minuteSelectId);
+            
+            if (!hourSelect || !minuteSelect) return;
+            
+            // selectにオプションを追加
+            populateHourSelect(hourSelect);
+            populateMinuteSelect(minuteSelect);
+            
+            if (timeValue && timeValue.includes(':')) {
+                const [hour, minute] = timeValue.split(':');
+                hourSelect.value = hour.padStart(2, '0');
+                minuteSelect.value = minute.padStart(2, '0');
+            }
+        }
+
+        // 時と分のselectから時間文字列（HH:MM）を取得
+        function getTimeFromSelects(hourSelectId, minuteSelectId) {
+            const hour = document.getElementById(hourSelectId)?.value;
+            const minute = document.getElementById(minuteSelectId)?.value;
+            if (hour && minute) {
+                return `${hour}:${minute}`;
+            }
+            return '';
+        }
+
+        // ボタンの処理中状態を管理
+        function setButtonLoading(button, loading) {
+            if (loading) {
+                button.disabled = true;
+                button.style.opacity = '0.6';
+            } else {
+                button.disabled = false;
+                button.style.opacity = '1';
+            }
+        }
+
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', async () => {
+            // suppressModalOnLoad を初期化して、ナビ遷移時の不意なモーダル表示を防ぐ
+            window.suppressModalOnLoad = true;
+
+            // シフト確定日設定を読み込み
+            loadConfirmationSettings();
+
+            // 時刻selectを初期化
+            setTimeSelects('morningStartHour', 'morningStartMinute', '');
+            setTimeSelects('morningEndHour', 'morningEndMinute', '');
+            setTimeSelects('afternoonStartHour', 'afternoonStartMinute', '');
+            setTimeSelects('afternoonEndHour', 'afternoonEndMinute', '');
+            setTimeSelects('startHour', 'startMinute', '');
+            setTimeSelects('endHour', 'endMinute', '');
+
+            // 現在の月を先に設定してカレンダーを表示
+            setCurrentMonth();
+            
+            // 並列で非同期処理を実行
+            const [employees, tasks] = await Promise.all([
+                loadEmployees(),
+                loadTasks()
+            ]);
+            
+            setDefaultDates();
+            // カレンダー更新
+            await updateShiftCalendar();
+            // ボタン状態を更新（過去月なら自動生成を無効にする）
+            updateGenerateButtons();
+            // Ensure modal is explicitly hidden on initial load (prevent accidental auto-open)
+            const modal = document.getElementById('shiftModal');
+            if (modal) { modal.style.display = 'none'; }
+            try { closeShiftModal(); } catch(e) { /* ignore in initialization */ }
+            try { clearFormFields(); } catch(e) { /* ignore */ }
+
+            // 初期化が終わったら抑制を解除（短い遅延を入れて安全に）
+            setTimeout(() => { window.suppressModalOnLoad = false; }, 100);
+        });
+
+        // 現在の月を設定
+        function setCurrentMonth() {
+            const now = new Date();
+            document.getElementById('calendarMonth').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        // URLクエリ取得
+        function getQueryParam(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name);
+        }
+
+        // シフトカレンダー更新
+        async function updateShiftCalendar() {
+            const monthValue = document.getElementById('calendarMonth').value;
+            if (!monthValue) return;
+            
+            // 月が変更されたら自動生成ボタンの状態を更新
+            updateGenerateButtons();
+            
+            // ローディング表示
+            const loadingContainer = document.getElementById('calendarLoadingContainer');
+            const calendar = document.getElementById('shiftCalendar');
+            if (loadingContainer) loadingContainer.style.display = 'flex';
+            if (calendar) calendar.style.display = 'none';
+            
+            const [year, month] = monthValue.split('-').map(Number);
+            const firstDay = new Date(year, month - 1, 1);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+            
+            // ヘッダーを先に表示
+            const headers = ['日', '月', '火', '水', '木', '金', '土'];
+            calendar.innerHTML = '';
+            headers.forEach(header => {
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'calendar-header';
+                headerDiv.textContent = header;
+                calendar.appendChild(headerDiv);
+            });
+            
+            // 空のカレンダーセルを先に作成
+            const cellsFragment = document.createDocumentFragment();
+            for (let i = 0; i < 42; i++) {
+                const cellDate = new Date(startDate);
+                cellDate.setDate(startDate.getDate() + i);
+                
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'calendar-day';
+                
+                if (cellDate.getMonth() !== month - 1) {
+                    dayDiv.classList.add('other-month');
+                }
+                
+                if (cellDate.toDateString() === new Date().toDateString()) {
+                    dayDiv.classList.add('today');
+                }
+                
+                const dateStr = cellDate.toISOString().split('T')[0];
+                dayDiv.innerHTML = `<div class="day-number">${cellDate.getDate()}</div>`;
+                dayDiv.onclick = () => openShiftModal(dateStr);
+                cellsFragment.appendChild(dayDiv);
+            }
+            calendar.appendChild(cellsFragment);
+            
+            // シフトデータを非同期で取得して更新
+            try {
+                const response = await fetch(`${API_BASE}/shifts/by-month/${monthValue}`);
+                let serverShifts = response.ok ? await response.json() : [];
+                
+                // Merge server shifts and preview shifts
+                const shiftMap = new Map();
+                serverShifts.forEach(s => {
+                    const key = `${s.date}#${s.employee_id}`;
+                    shiftMap.set(key, s);
+                });
+                if (previewMonth && previewMonth === monthValue) {
+                    previewShifts.forEach(s => {
+                        const key = `${s.date}#${s.employee_id}`;
+                        shiftMap.set(key, {...s, _preview: true});
+                    });
+                }
+                const shifts = Array.from(shiftMap.values());
+                
+                // シフト情報を各セルに追加
+                const dayDivs = calendar.querySelectorAll('.calendar-day:not(.calendar-header)');
+                dayDivs.forEach((dayDiv, i) => {
+                    const cellDate = new Date(startDate);
+                    cellDate.setDate(startDate.getDate() + i);
+                    const dateStr = cellDate.toISOString().split('T')[0];
+                    const dayShifts = shifts.filter(s => s.date === dateStr);
+                    
+                    if (dayShifts.length > 0) {
+                        const shiftsHtml = dayShifts.map(s => {
+                            const conflictClass = s.vacation_conflict ? ' vacation-conflict' : '';
+                            const previewClass = s._preview ? ' preview' : '';
+                            
+                            // 午前・午後の判定（start_timeが12:00より前なら午前、それ以外は午後）
+                            let shiftTypeClass = '';
+                            if (s.start_time) {
+                                const [hour] = s.start_time.split(':').map(Number);
+                                shiftTypeClass = hour < 12 ? ' morning' : ' afternoon';
+                            }
+                            
+                            const empName = employeesMap[s.employee_id] || s.employee_id;
+                            return `<div class="shift-assignment${conflictClass}${previewClass}${shiftTypeClass}">${getTaskName(s.task_type)} — ${empName}${s._preview? ' (プレビュー)':''}</div>`;
+                        }).join('');
+                        dayDiv.innerHTML += shiftsHtml;
+                    }
+                });
+            } catch (error) {
+                console.error('シフトデータ取得エラー:', error);
+            } finally {
+                // ローディング非表示、カレンダー表示
+                if (loadingContainer) loadingContainer.style.display = 'none';
+                if (calendar) calendar.style.display = 'grid';
+            }
+        }
+
+        // シフトモーダルを開く（指定日のシフト一覧を読み込み）
+        // force=true を渡すと suppress フラグに関係なく強制表示する
+        async function openShiftModal(date, force=false) {
+            // モーダルを先に表示して読み込み中メッセージを表示
+            if (!window.suppressModalOnLoad || force) {
+                const modal = document.getElementById('shiftModal');
+                modal.classList.add('is-open');
+                modal.style.display = 'flex';
+                
+                // 読み込み中メッセージを表示
+                document.getElementById('dayShiftsList').innerHTML = '<div class="loading-message"><span class="spinner"></span>シフトデータを読み込んでいます...</div>';
+            }
+            
+            document.getElementById('shiftDate').value = date;
+            document.getElementById('shiftDateDisplay').textContent = date;
+            // Initialize button states (add mode by default)
+            updateButtonStates(false);
+            // Load shifts for date (server side) and include preview items
+            await loadShiftsForDate(date);
+        }
+
+        // シフトモーダルを閉じる
+        function closeShiftModal() {
+            const modal = document.getElementById('shiftModal');
+            modal.classList.remove('is-open');
+            modal.style.display = 'none';
+            document.getElementById('shiftForm').reset();
+            document.getElementById('dayShiftsList').innerHTML = '';
+            document.getElementById('modalMessage').innerHTML = '';
+            // Reset button states
+            updateButtonStates(false);
+        }
+
+        // 月が過去かどうか判定
+        function isMonthInPast(monthValue) {
+            if (!monthValue) return false;
+            const [y, m] = monthValue.split('-').map(Number);
+            const now = new Date();
+            const nowY = now.getFullYear();
+            const nowM = now.getMonth() + 1;
+            return (y < nowY) || (y === nowY && m < nowM);
+        }
+
+        // 自動生成ボタンの有効/無効を更新
+        function updateGenerateButtons() {
+            const monthValue = document.getElementById('calendarMonth').value;
+            const disabled = isMonthInPast(monthValue);
+            
+            const morningBtn = document.getElementById('generateMorningBtn');
+            if (morningBtn) {
+                morningBtn.disabled = disabled;
+                morningBtn.title = disabled ? '過去月のため自動生成できません' : '選択した月の午前シフトを自動生成します';
+            }
+            
+            const afternoonBtn = document.getElementById('generateAfternoonBtn');
+            if (afternoonBtn) {
+                afternoonBtn.disabled = disabled;
+                afternoonBtn.title = disabled ? '過去月のため自動生成できません' : '選択した月の午後シフトを自動生成します';
+            }
+            
+            const pastMonthMessage = document.getElementById('pastMonthMessage');
+            if (pastMonthMessage) {
+                pastMonthMessage.textContent = disabled ? '過去日の編集はできません' : '';
+            }
+        }
+
+        // 現在のグローバルデフォルト人数を取得（UI上の値またはAPIから取得）
+        async function getCurrentDefaultRequirements() {
+            // UIに表示されている値があればそれを使用
+            const uiReqs = {};
+            const inputs = document.querySelectorAll('#globalDefaultRequirements input[data-task]');
+            if (inputs.length > 0) {
+                inputs.forEach(input => {
+                    uiReqs[input.dataset.task] = parseInt(input.value) || 0;
+                });
+                return uiReqs;
+            }
+            
+            // UIにない場合はAPIから取得
+            try {
+                const response = await fetch(`${API_BASE}/requirements/global-default`);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('APIから取得した人数設定:', data);
+                    return data;
+                }
+            } catch (error) {
+                console.error('デフォルト人数取得エラー:', error);
+            }
+            
+            // フォールバック：デフォルト値
+            const fallback = {'milking': 2, 'feeding': 1, 'cleaning': 1, 'patrol': 1};
+            console.log('フォールバック人数設定を使用:', fallback);
+            return fallback;
+        }
+
+        // 月間シフト自動生成 (対象は常に表示月)。使用する必要人数は、UIに表示されているグローバルデフォルト値を利用する
+        async function generateMonthlyShifts(event, shiftType = 'both') {
+            console.log('シフト自動生成ボタンがクリックされました。shiftType:', shiftType);
+            
+            const button = event?.target;
+            const originalText = button?.textContent;
+            if (button) {
+                button.textContent = '🔄 処理中...';
+                setButtonLoading(button, true);
+            }
+            
+            const monthValue = document.getElementById('calendarMonth').value;
+            console.log('選択された月:', monthValue);
+            
+            if (!monthValue) {
+                showMessage('generateMessage', 'error', '月を選択してください');
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
+                return;
+            }
+            if (isMonthInPast(monthValue)) {
+                console.log('過去の月が選択されています:', monthValue);
+                showMessage('generateMessage', 'error', '表示月が過去のため、自動シフト生成できません');
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
+                return;
+            }
+            const requirements = await getCurrentDefaultRequirements();
+            console.log('使用する人数設定:', requirements);
+
+            // Preview generation first (do not commit) — reflect on calendar instead of modal
+            try {
+                console.log('APIリクエストを送信中...');
+                const previewRes = await fetch(`${API_BASE}/shifts/generate-monthly`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        month: monthValue, 
+                        overwrite: false, 
+                        preview: true, 
+                        requirements,
+                        shift_type: shiftType  // 'morning', 'afternoon', or 'both'
+                    })
+                });
+                
+                console.log('APIレスポンスステータス:', previewRes.status);
+                
+                if (!previewRes.ok) {
+                    // APIからのエラーレスポンスを解析
+                    let errorMessage = 'シフト生成プレビューに失敗しました';
+                    try {
+                        const errorData = await previewRes.json();
+                        console.log('APIエラーレスポンス:', errorData);
+                        if (errorData.error) {
+                            errorMessage = errorData.error;
+                        }
+                    } catch (e) {
+                        // JSONパースに失敗した場合はテキストを取得
+                        try {
+                            const textError = await previewRes.text();
+                            console.log('APIエラーテキスト:', textError);
+                            errorMessage = textError || errorMessage;
+                        } catch (e2) {
+                            // テキスト取得も失敗した場合はデフォルトメッセージ
+                            console.log('エラーレスポンスの解析に失敗:', e2);
+                        }
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                const previewData = await previewRes.json();
+                console.log('プレビューデータを受信:', previewData);
+                
+                if (previewData.shifts && previewData.shifts.length > 0) {
+                    // Apply preview to calendar (client-side only)
+                    applyPreviewToCalendar(monthValue, previewData.shifts);
+                } else {
+                    showMessage('generateMessage', 'error', 'シフトが生成されませんでした。従業員データや人数設定を確認してください。');
+                }
+            } catch (error) {
+                console.error('シフト生成エラー:', error);
+                showMessage('generateMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
+            }
+        }
+
+        // 既存シフト数をチェック
+        async function checkExistingShifts(month) {
+            try {
+                const response = await fetch(`${API_BASE}/shifts/by-month/${month}`);
+                if (response.ok) {
+                    const shifts = await response.json();
+                    return shifts.length;
+                }
+            } catch (error) {
+                console.error('既存シフトチェックエラー:', error);
+            }
+            return 0;
+        }
+
+        // Apply preview to calendar (client-side) — do not write to DB until user confirms
+        function applyPreviewToCalendar(month, shifts) {
+            previewMonth = month;
+            // Mark preview shifts so UI can style and modal can indicate readonly
+            previewShifts = shifts.map(s => ({...s, _preview: true}));
+            // Re-render calendar for the selected month if visible
+            document.getElementById('calendarMonth').value = month;
+            updateShiftCalendar();
+
+            // Show persistent preview message with confirm/cancel
+            document.getElementById('generateMessage').innerHTML = `<div class="message success">${month} のプレビューをカレンダーに反映しました。<br><button id="commitPreviewBtn" class="btn-success" onclick="commitPreview(event)" style="margin-top: 10px;">確定（DBに登録）</button> <button id="cancelPreviewBtn" onclick="cancelPreview()" class="btn" style="margin-top: 10px;">取消</button></div>`;
+        }
+
+        // Processing state helper
+        window.isProcessing = false;
+        function updateProcessingUI() {
+            const genBtn2 = document.getElementById('generateMonthBtn2');
+            const commitBtn = document.getElementById('commitPreviewBtn');
+            const cancelBtn = document.getElementById('cancelPreviewBtn');
+
+            if (window.isProcessing) {
+                if (genBtn2) { genBtn2.disabled = true; genBtn2.dataset.prevText = genBtn2.innerHTML; genBtn2.innerHTML = '<span class="spinner"></span>処理中'; }
+                if (commitBtn) { commitBtn.disabled = true; commitBtn.dataset.prevText = commitBtn.innerHTML; commitBtn.innerHTML = '<span class="spinner"></span>登録中'; }
+                if (cancelBtn) { cancelBtn.disabled = true; }
+            } else {
+                if (genBtn2 && genBtn2.dataset.prevText) { genBtn2.disabled = false; genBtn2.innerHTML = genBtn2.dataset.prevText; genBtn2.dataset.prevText = ''; }
+                if (commitBtn && commitBtn.dataset.prevText) { commitBtn.disabled = false; commitBtn.innerHTML = commitBtn.dataset.prevText; commitBtn.dataset.prevText = ''; }
+                if (cancelBtn) { cancelBtn.disabled = false; }
+            }
+        }
+
+        function setProcessing(flag, message) {
+            window.isProcessing = !!flag;
+            if (message && flag) {
+                document.getElementById('generateMessage').innerHTML = `<div class="message success"><span class="spinner"></span>${message}</div>`;
+            } else if (!flag) {
+                // clear transient processing message (persistent preview message handled separately)
+                const gm = document.getElementById('generateMessage');
+                // only clear if the message looks like a processing message
+                if (gm && gm.innerText && /処理中|登録中|取得中/.test(gm.innerText)) gm.innerHTML = '';
+            }
+            updateProcessingUI();
+        }
+
+        async function commitPreview(event) {
+            if (!previewMonth) return;
+            const button = event?.target || document.getElementById('commitPreviewBtn');
+            const originalText = button?.textContent;
+            if (button) {
+                button.textContent = '🔄 登録中...';
+                setButtonLoading(button, true);
+            }
+            
+            const monthValue = previewMonth;
+            setProcessing(true, '登録中...');
+            try {
+                const existingShifts = await checkExistingShifts(monthValue);
+                if (existingShifts > 0) {
+                    const ok = confirm(`${monthValue}には既に${existingShifts}件のシフトがあります。登録すると既存のシフトが削除されますが、よろしいですか？`);
+                    if (!ok) {
+                        setProcessing(false);
+                        if (button) {
+                            button.textContent = originalText;
+                            setButtonLoading(button, false);
+                        }
+                        return;
+                    }
+                }
+
+                const requirements = await getCurrentDefaultRequirements();
+                const commitRes = await fetch(`${API_BASE}/shifts/generate-monthly`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ month: monthValue, overwrite: true, preview: false, requirements })
+                });
+                
+                if (!commitRes.ok) {
+                    // APIからのエラーレスポンスを解析
+                    let errorMessage = 'シフト登録に失敗しました';
+                    try {
+                        const errorData = await commitRes.json();
+                        if (errorData.error) {
+                            errorMessage = errorData.error;
+                        }
+                    } catch (e) {
+                        // JSONパースに失敗した場合はテキストを取得
+                        try {
+                            errorMessage = await commitRes.text() || errorMessage;
+                        } catch (e2) {
+                            // テキスト取得も失敗した場合はデフォルトメッセージ
+                        }
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                showMessage('generateMessage', 'success', `✓ ${monthValue}のシフトを登録しました。`);
+                // clear preview and refresh from server
+                previewMonth = null;
+                previewShifts = [];
+                updateShiftCalendar();
+            } catch (error) {
+                console.error('シフト登録エラー:', error);
+                showMessage('generateMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                setProcessing(false);
+                if (button) setButtonLoading(button, false);
+            }
+        }
+
+        function cancelPreview() {
+            previewMonth = null;
+            previewShifts = [];
+            document.getElementById('generateMessage').innerHTML = '';
+            updateShiftCalendar();
+        }
+
+        // 従業員一覧読み込み
+        // Keep full employee data for filtering
+        let employeesData = [];
+        async function loadEmployees() {
+            try {
+                const response = await fetch(`${API_BASE}/employees`);
+                const employees = await response.json();
+                employeesData = employees;
+                
+                // 従業員マップを更新
+                employeesMap = {};
+                employees.forEach(emp => {
+                    employeesMap[emp.employee_id] = emp.name;
+                });
+                
+                const selects = [];
+                const empSelectEl = document.getElementById('employeeSelect');
+                if (empSelectEl) selects.push(empSelectEl);
+                const empFilterEl = document.getElementById('employeeFilter');
+                if (empFilterEl) selects.push(empFilterEl);
+
+                selects.forEach(select => {
+                    const currentValue = select.value || '';
+                    select.innerHTML = select.id === 'employeeFilter' ? '<option value="">全従業員</option>' : '<option value="">従業員を選択</option>';
+
+                    employees.forEach(emp => {
+                        const option = document.createElement('option');
+                        option.value = emp.employee_id;
+                        option.textContent = `${emp.name} (${emp.employee_id})`;
+                        select.appendChild(option);
+                    });
+
+                    try { select.value = currentValue; } catch(e) { /* ignore */ }
+                });
+
+                // When task changes, limit employee list to those with skill
+                const taskSelectEl = document.getElementById('taskSelect');
+                taskSelectEl.addEventListener('change', () => {
+                    populateEmployeeSelect(taskSelectEl.value);
+                });
+
+            } catch (error) {
+                console.error('従業員読み込みエラー:', error);
+            }
+        }
+
+        function populateEmployeeSelect(taskType) {
+            const select = document.getElementById('employeeSelect');
+            const current = select.value || '';
+            select.innerHTML = '<option value="">従業員を選択</option>';
+            const candidates = taskType ? employeesData.filter(e => (e.skills||[]).includes(taskType)) : employeesData;
+
+            candidates.forEach(emp => {
+                const opt = document.createElement('option');
+                opt.value = emp.employee_id;
+                opt.textContent = `${emp.name} (${emp.employee_id})`;
+                select.appendChild(opt);
+            });
+
+            // If current selection exists but is not in candidates (data mismatch), ensure it is present so editing doesn't lose selection
+            if (current && !Array.from(select.options).some(o => o.value === current)) {
+                // Find employee object by id
+                const emp = employeesData.find(e => e.employee_id === current);
+                const opt = document.createElement('option');
+                opt.value = current;
+                opt.textContent = emp ? `${emp.name} (${emp.employee_id})` : current;
+                select.appendChild(opt);
+            }
+
+            // Restore selection if available
+            try { select.value = current; } catch(e) { /* ignore */ }
+        }
+
+        // 作業種別一覧読み込み
+        async function loadTasks() {
+            try {
+                const response = await fetch(`${API_BASE}/tasks`);
+                const tasks = await response.json();
+                
+                const select = document.getElementById('taskSelect');
+                const currentValue = select.value;
+                select.innerHTML = '<option value="">作業を選択</option>';
+                
+                tasks.forEach(task => {
+                    const option = document.createElement('option');
+                    option.value = task.task_type;
+                    option.textContent = `${task.name} (${task.task_type})`;
+                    select.appendChild(option);
+                });
+                
+                select.value = currentValue;
+            } catch (error) {
+                console.error('作業種別読み込みエラー:', error);
+            }
+        }
+
+        // デフォルト日付設定
+        function setDefaultDates() {
+            const today = new Date().toISOString().split('T')[0];
+            const shiftDateEl = document.getElementById('shiftDate');
+            if (shiftDateEl) shiftDateEl.value = today;
+            const searchDateEl = document.getElementById('searchDate');
+            if (searchDateEl) searchDateEl.value = today;
+            const assignDateEl = document.getElementById('assignDate');
+            if (assignDateEl) assignDateEl.value = today;
+        }
+
+        // シフト作成（追加ボタン用）
+        document.getElementById('shiftForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Only create new shift (add button action)
+            const data = {
+                date: document.getElementById('shiftDate').value,
+                employee_id: document.getElementById('employeeSelect').value,
+                task_type: document.getElementById('taskSelect').value,
+                start_time: document.getElementById('startTime').value,
+                end_time: document.getElementById('endTime').value,
+                status: document.getElementById('shiftStatus').value
+            };
+
+            // Prevent editing past dates
+            const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+            if (new Date(date) < new Date(new Date().toISOString().split('T')[0])) {
+                showMessage('modalMessage', 'error', '過去日の編集はできません');
+                return;
+            }
+
+            // Validate employee and task selection
+            if (!data.employee_id) { showMessage('modalMessage', 'error', '従業員を選択してください'); return; }
+            if (!data.task_type) { showMessage('modalMessage', 'error', '作業種別を選択してください'); return; }
+
+            // Ensure selected employee is not already registered for the date
+            const registeredIds = new Set((window.currentDayShifts||[]).map(s => s.employee_id));
+            if (registeredIds.has(data.employee_id)) {
+                showMessage('modalMessage', 'error', '選択した従業員は既にその日に割り当てられています');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/shifts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    showMessage('modalMessage', 'success', 'シフトを追加しました');
+                    clearFormFields();
+                    // refresh day list and calendar
+                    await loadShiftsForDate(date);
+                    updateShiftCalendar();
+                } else {
+                    let errText = await response.text();
+                    try { const j = JSON.parse(errText); errText = j.error || j.message || errText; } catch(e){}
+                    throw new Error(errText || '操作に失敗しました');
+                }
+            } catch (error) {
+                showMessage('modalMessage', 'error', `エラー: ${error.message}`);
+            }
+        });
+
+        // 自動シフト割り当て
+        const autoAssignForm = document.getElementById('autoAssignForm');
+        if (autoAssignForm) {
+            autoAssignForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const requiredTasks = [];
+                document.querySelectorAll('#taskRequirements input[type="number"]').forEach(input => {
+                    const count = parseInt(input.value);
+                    if (count > 0) {
+                        requiredTasks.push({
+                            task_type: input.dataset.task,
+                            count: count
+                        });
+                    }
+                });
+
+                const data = {
+                    date: document.getElementById('assignDate').value,
+                    required_tasks: requiredTasks
+                };
+
+                try {
+                    const response = await fetch(`${API_BASE}/shifts/assign`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        showMessage('assignMessage', 'success', '自動シフト割り当てが完了しました');
+                        searchShifts();
+                    } else {
+                        let errText = await response.text();
+                        try { const j = JSON.parse(errText); errText = j.error || j.message || errText; } catch(e){}
+                        throw new Error(errText || '自動割り当てに失敗しました');
+                    }
+                } catch (error) {
+                    showMessage('assignMessage', 'error', `エラー: ${error.message}`);
+                }
+            });
+        }
+
+        // シフト検索
+        async function searchShifts() {
+            const date = document.getElementById('searchDate').value;
+            const employeeId = document.getElementById('employeeFilter').value;
+            
+            if (!date) {
+                showMessage('shiftResults', 'error', '検索日付を選択してください');
+                return;
+            }
+
+            try {
+                let url = `${API_BASE}/shifts/by-date/${date}`;
+                if (employeeId) {
+                    url = `${API_BASE}/employees/${employeeId}/shifts?date=${date}`;
+                }
+                
+                const response = await fetch(url);
+                const shifts = await response.json();
+                
+                displayShifts(shifts);
+            } catch (error) {
+                document.getElementById('shiftResults').innerHTML = 
+                    `<div class="error">エラー: ${error.message}</div>`;
+            }
+        }
+
+        // 今日のシフト読み込み
+        function loadTodayShifts() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('searchDate').value = today;
+            searchShifts();
+        }
+
+        // 指定日のシフト一覧を取得してモーダル内に表示
+        async function loadShiftsForDate(date) {
+            const listDiv = document.getElementById('dayShiftsList');
+            listDiv.innerHTML = '<div class="loading-message"><span class="spinner"></span>シフトデータを読み込んでいます...</div>';
+            const isPast = new Date(date) < new Date(new Date().toISOString().split('T')[0]);
+
+            try {
+                const response = await fetch(`${API_BASE}/shifts/by-date/${date}`);
+                let shifts = response.ok ? await response.json() : [];
+                // include preview shifts for this month
+                if (previewMonth && previewMonth === date.slice(0,7)) {
+                    const added = previewShifts.filter(s => s.date === date).map(s => ({...s, _preview: true}));
+                    shifts = shifts.concat(added);
+                }
+
+                if (shifts.length === 0) {
+                    listDiv.innerHTML = '<p>該当するシフトがありません</p>';
+                } else {
+                    // store current day shifts for other helpers
+                    window.currentDayShifts = shifts;
+
+                    listDiv.innerHTML = shifts.map(s => {
+                        const empName = employeesMap[s.employee_id] || s.employee_id;
+                        const disabledAttr = s._preview ? 'disabled title="プレビュー中のため操作不可"' : '';
+                        const chkId = s.shift_id ? `chk_${s.shift_id}` : `chk_preview_${btoa(s.date + s.task_type).replace(/=/g,'')}`;
+                        return `<div>` +
+                            `<input type="checkbox" class="shift-checkbox" id="${chkId}" data-shift-id="${s.shift_id||''}" ${disabledAttr} onchange="onShiftCheckboxChange(this, '${s.shift_id||''}')">` +
+                            `<div>` +
+                            `<strong>${getTaskName(s.task_type)}${s._preview? ' (プレビュー)':''}</strong><br>` +
+                            `${empName} ${s.start_time || ''} - ${s.end_time || ''}` +
+                            `</div>` +
+                            `</div>`;
+                    }).join('');
+                }
+
+                // Add / Edit UI enablement
+                const addBtn = document.getElementById('addShiftBtn');
+                if (addBtn) addBtn.style.display = 'none';
+
+                // Ensure controls are not active during processing
+                if (window.isProcessing) {
+                    // disable checkboxes in the list
+                    listDiv.querySelectorAll('input[type="checkbox"]').forEach(b => b.disabled = true);
+                }
+
+                // After rendering, update employee select choices (exclude already registered employees)
+                refreshEmployeeSelectForDate(date);
+
+                // Update commit/cancel buttons when processing state changes
+                updateProcessingUI();
+
+            } catch (error) {
+                listDiv.innerHTML = `<div class="error">エラー: ${error.message}</div>`;
+            }
+        }
+
+        function startAddShift() {
+            // Deprecated: kept for backward compatibility — use clearFormFields and ensure employee list excludes already registered
+            clearFormFields();
+        }
+
+        // Refresh employee select to exclude employees already registered on the date (unless currentEmployee is passed)
+        function refreshEmployeeSelectForDate(date, currentEmployee=null) {
+            const select = document.getElementById('employeeSelect');
+            select.innerHTML = '<option value="">従業員を選択</option>';
+            const registeredIds = new Set((window.currentDayShifts||[]).map(s => s.employee_id));
+
+            const candidates = employeesData.filter(e => {
+                if (!e || !e.employee_id) return false;
+                if (currentEmployee && e.employee_id === currentEmployee) return true;
+                return !registeredIds.has(e.employee_id);
+            });
+
+            candidates.forEach(emp => {
+                const opt = document.createElement('option');
+                opt.value = emp.employee_id;
+                opt.textContent = `${emp.name} (${emp.employee_id})`;
+                select.appendChild(opt);
+            });
+
+            // If currentEmployee provided, ensure it's selected
+            if (currentEmployee) {
+                try { select.value = currentEmployee; } catch(e) {}
+            }
+
+            // Trigger change to populate tasks
+            const ev = new Event('change');
+            select.dispatchEvent(ev);
+        }
+
+        // When a shift checkbox is toggled, populate the form for editing (single selection behavior)
+        function onShiftCheckboxChange(checkbox, shiftId) {
+            // Uncheck other checkboxes (single select for edit)
+            document.querySelectorAll('.shift-checkbox').forEach(cb => {
+                if (cb !== checkbox) cb.checked = false;
+            });
+
+            if (!checkbox.checked) {
+                clearFormFields();
+                updateButtonStates(false);
+                return;
+            }
+
+            // Enable edit and delete buttons, disable add button
+            updateButtonStates(true);
+
+            const shift = (window.currentDayShifts||[]).find(s => s.shift_id === shiftId);
+            if (!shift) {
+                showMessage('modalMessage', 'error', '選択したシフト情報が見つかりません');
+                return;
+            }
+
+            // Set form fields for editing
+            document.getElementById('shiftId').value = shift.shift_id;
+            document.getElementById('shiftDate').value = shift.date;
+            document.getElementById('shiftDateDisplay').textContent = shift.date;
+
+            // Refresh employee select to include the selected employee even if already registered
+            refreshEmployeeSelectForDate(shift.date, shift.employee_id);
+
+            // Set employee and populate tasks
+            document.getElementById('employeeSelect').value = shift.employee_id;
+            // Wait a tick for employee change to populate task select
+            setTimeout(() => {
+                document.getElementById('taskSelect').value = shift.task_type;
+            }, 0);
+
+            // selectに値を設定
+            setTimeSelects('startHour', 'startMinute', shift.start_time || '');
+            setTimeSelects('endHour', 'endMinute', shift.end_time || '');
+
+            // Clear modal message
+            document.getElementById('modalMessage').innerHTML = '';
+        }
+
+        // Clear the input fields in the modal (but keep modal open)
+        function clearFormFields() {
+            document.getElementById('shiftId').value = '';
+            // repopulate employee select to exclude registered employees
+            const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+            refreshEmployeeSelectForDate(date, null);
+            document.getElementById('taskSelect').innerHTML = '<option value="">作業を選択</option>';
+            document.getElementById('employeeSelect').value = '';
+            
+            // selectを空に戻す
+            setTimeSelects('startHour', 'startMinute', '');
+            setTimeSelects('endHour', 'endMinute', '');
+            setTimeSelects('morningStartHour', 'morningStartMinute', '');
+            setTimeSelects('morningEndHour', 'morningEndMinute', '');
+            setTimeSelects('afternoonStartHour', 'afternoonStartMinute', '');
+            setTimeSelects('afternoonEndHour', 'afternoonEndMinute', '');
+            
+            document.getElementById('modalMessage').innerHTML = '';
+            // Uncheck all checkboxes
+            document.querySelectorAll('.shift-checkbox').forEach(cb => cb.checked = false);
+            updateButtonStates(false);
+        }
+
+        // Update button states based on checkbox selection
+        function updateButtonStates(isEditing) {
+            const addBtn = document.getElementById('addBtn');
+            const updateBtn = document.getElementById('updateBtn');
+            const deleteBtn = document.getElementById('deleteBtn');
+            
+            if (isEditing) {
+                // Editing mode: enable update and delete, disable add
+                addBtn.disabled = true;
+                updateBtn.disabled = false;
+                deleteBtn.disabled = false;
+            } else {
+                // Add mode: enable add, disable update and delete
+                addBtn.disabled = false;
+                updateBtn.disabled = true;
+                deleteBtn.disabled = true;
+            }
+        }
+
+        // Update selected shift
+        async function updateShift(event) {
+            event.preventDefault();
+            
+            const shiftId = document.getElementById('shiftId').value;
+            if (!shiftId) {
+                showMessage('modalMessage', 'error', '変更するシフトが選択されていません');
+                return;
+            }
+            
+            const data = {
+                date: document.getElementById('shiftDate').value,
+                employee_id: document.getElementById('employeeSelect').value,
+                task_type: document.getElementById('taskSelect').value,
+                start_time: document.getElementById('startTime').value,
+                end_time: document.getElementById('endTime').value,
+                status: document.getElementById('shiftStatus').value
+            };
+
+            // Prevent editing past dates
+            const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+            if (new Date(date) < new Date(new Date().toISOString().split('T')[0])) {
+                showMessage('modalMessage', 'error', '過去日の編集はできません');
+                return;
+            }
+
+            // Validate employee and task selection
+            if (!data.employee_id) { showMessage('modalMessage', 'error', '従業員を選択してください'); return; }
+            if (!data.task_type) { showMessage('modalMessage', 'error', '作業種別を選択してください'); return; }
+
+            try {
+                const response = await fetch(`${API_BASE}/shifts/${shiftId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    showMessage('modalMessage', 'success', 'シフトを更新しました');
+                    clearFormFields();
+                    // refresh day list and calendar
+                    await loadShiftsForDate(date);
+                    updateShiftCalendar();
+                } else {
+                    let errText = await response.text();
+                    try { const j = JSON.parse(errText); errText = j.error || j.message || errText; } catch(e){}
+                    throw new Error(errText || '操作に失敗しました');
+                }
+            } catch (error) {
+                showMessage('modalMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
+        // Delete selected shift(s) after confirmation
+        async function deleteSelectedShifts(event) {
+            const checked = Array.from(document.querySelectorAll('.shift-checkbox')).filter(cb => cb.checked && cb.dataset.shiftId);
+            if (checked.length === 0) {
+                showMessage('modalMessage', 'error', '削除するデータを選択してください');
+                return;
+            }
+
+            if (!confirm('登録データを削除しますか？')) return;
+
+            const button = event?.target || document.getElementById('deleteBtn');
+            const originalText = button?.textContent;
+            if (button) {
+                button.textContent = '🔄 削除中...';
+                setButtonLoading(button, true);
+            }
+            setProcessing(true, '削除中...');
+            try {
+                const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+                for (const cb of checked) {
+                    const sid = cb.dataset.shiftId;
+                    if (!sid) continue; // skip preview/no-id
+                    const res = await fetch(`${API_BASE}/shifts/${sid}`, { method: 'DELETE' });
+                    if (!res.ok) throw new Error('削除に失敗しました');
+                }
+                showMessage('modalMessage', 'success', '✓ 削除しました。');
+                // Refresh list and calendar
+                await loadShiftsForDate(date);
+                updateShiftCalendar();
+            } catch (error) {
+                showMessage('modalMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                setProcessing(false);
+                if (button) {
+                    button.textContent = originalText;
+                    setButtonLoading(button, false);
+                }
+            }
+        }
+
+        // シフト表示
+        function displayShifts(shifts) {
+            const resultsDiv = document.getElementById('shiftResults');
+            
+            if (shifts.length === 0) {
+                resultsDiv.innerHTML = '<p>該当するシフトがありません</p>';
+                return;
+            }
+
+                resultsDiv.innerHTML = shifts.map(shift => {
+                    const empName = employeesMap[shift.employee_id] || shift.employee_id;
+                    return `
+                <div class="shift-card">
+                    <h4>${shift.date} - ${getTaskName(shift.task_type)}${shift._preview? ' (プレビュー)':''}</h4>
+                    <p><strong>従業員:</strong> ${empName}</p>
+                    <p><strong>時間:</strong> ${shift.start_time} - ${shift.end_time}</p>
+                    <p><strong>ステータス:</strong> ${getStatusName(shift.status)}</p>
+                    <button onclick="editShift('${shift.shift_id}')" ${shift._preview? 'disabled title="プレビュー中のシフトは編集できません"':''}>編集</button>
+                    <button class="btn-danger" onclick="deleteShift('${shift.shift_id}')" ${shift._preview? 'disabled':''}>削除</button>
+                </div>
+            `}).join('');
+        }
+
+        // シフト編集
+        async function editShift(shiftId) {
+            try {
+                const response = await fetch(`${API_BASE}/shifts/${shiftId}`);
+                if (!response.ok) throw new Error('シフトを取得できませんでした');
+                const shift = await response.json();
+
+                // Open modal for the date and populate fields
+                // Force open modal for explicit edit actions
+                await openShiftModal(shift.date, true);
+
+                document.getElementById('shiftId').value = shift.shift_id;
+                document.getElementById('shiftDate').value = shift.date;
+                // Populate employee select with candidates for the task
+                document.getElementById('taskSelect').value = shift.task_type;
+                populateEmployeeSelect(shift.task_type);
+                document.getElementById('employeeSelect').value = shift.employee_id;
+                document.getElementById('startTime').value = shift.start_time;
+                document.getElementById('endTime').value = shift.end_time;
+                document.getElementById('shiftStatus').value = shift.status;
+                
+                document.getElementById('submitBtn').textContent = 'シフト更新';
+            } catch (error) {
+                showMessage('modalMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
+        // シフト削除
+        async function deleteShift(shiftId) {
+            if (!confirm('このシフトを削除しますか？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/shifts/${shiftId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showMessage('modalMessage', 'success', 'シフトを削除しました');
+                    // refresh current modal list and calendar
+                    const date = document.getElementById('shiftDate').value;
+                    await loadShiftsForDate(date);
+                    updateShiftCalendar();
+                } else {
+                    throw new Error('削除に失敗しました');
+                }
+            } catch (error) {
+                showMessage('modalMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
+        // フォームリセット
+        function resetForm() {
+            document.getElementById('shiftForm').reset();
+            document.getElementById('shiftId').value = '';
+            document.getElementById('submitBtn').textContent = 'シフト作成';
+            setDefaultDates();
+        }
+
+        // メッセージ表示
+        function showMessage(elementId, type, message) {
+            const messageDiv = document.getElementById(elementId);
+            messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
+            setTimeout(() => messageDiv.innerHTML = '', 5000);
+        }
+        // 従業員選択時に対応可能な作業種別のみ表示
+        const employeeSelectEl = document.getElementById('employeeSelect');
+        if (employeeSelectEl) {
+            employeeSelectEl.addEventListener('change', async function() {
+                const employeeId = this.value;
+                if (!employeeId) {
+                    loadTasks();
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`${API_BASE}/employees/${employeeId}`);
+                    const employee = await response.json();
+                    
+                    const taskSelect = document.getElementById('taskSelect');
+                    taskSelect.innerHTML = '<option value="">作業を選択</option>';
+                    
+                    if (employee.skills && employee.skills.length > 0) {
+                        const allTasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
+                        
+                        allTasks.forEach(task => {
+                            if (employee.skills.includes(task.task_type)) {
+                                const option = document.createElement('option');
+                                option.value = task.task_type;
+                                option.textContent = `${task.name} (${task.task_type})`;
+                                taskSelect.appendChild(option);
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('従業員情報取得エラー:', error);
+                    loadTasks(); // フォールバック
+                }
+            });
+        }
+        // 作業名変換
+        function getTaskName(taskType) {
+            const names = {
+                '1': '搾乳',
+                '2': '給餌',
+                '3': '清掃',
+                '4': '見回り',
+                // 後方互換性のため文字列IDも残す
+                'milking': '搾乳',
+                'feeding': '給餌',
+                'cleaning': '清掃',
+                'patrol': '見回り'
+            };
+            return names[taskType] || taskType;
+        }
+        
+        // 午前・午後シフトオプションの更新
+        function updateShiftTimeOptions() {
+            const morningChecked = document.getElementById('morningShift').checked;
+            const afternoonChecked = document.getElementById('afternoonShift').checked;
+            
+            document.getElementById('morningShiftSection').style.display = morningChecked ? 'block' : 'none';
+            document.getElementById('afternoonShiftSection').style.display = afternoonChecked ? 'block' : 'none';
+            
+            // 作業種別をロード
+            if (morningChecked) loadTasksToSelect('morningTaskSelect');
+            if (afternoonChecked) loadTasksToSelect('afternoonTaskSelect');
+            
+            // デフォルト時間を設定
+            if (morningChecked && !document.getElementById('morningStartTime').value) {
+                document.getElementById('morningStartTime').value = '06:00';
+                document.getElementById('morningEndTime').value = '12:00';
+            }
+            if (afternoonChecked && !document.getElementById('afternoonStartTime').value) {
+                document.getElementById('afternoonStartTime').value = '13:00';
+                document.getElementById('afternoonEndTime').value = '18:00';
+            }
+        }
+        
+        // 指定したセレクトボックスに作業種別をロード
+        async function loadTasksToSelect(selectId) {
+            try {
+                const response = await fetch(`${API_BASE}/tasks`);
+                const tasks = await response.json();
+                
+                const select = document.getElementById(selectId);
+                select.innerHTML = '<option value="">作業を選択</option>';
+                
+                tasks.forEach(task => {
+                    const option = document.createElement('option');
+                    option.value = task.task_type;
+                    option.textContent = `${task.name} (${task.task_type})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('作業種別読み込みエラー:', error);
+            }
+        }
+
+    </script>
+</body>
+
+<!-- 時間選択用datalist -->
+<datalist id="hour-options">
+    <option value="00"><option value="01"><option value="02"><option value="03"><option value="04"><option value="05">
+    <option value="06"><option value="07"><option value="08"><option value="09"><option value="10"><option value="11">
+    <option value="12"><option value="13"><option value="14"><option value="15"><option value="16"><option value="17">
+    <option value="18"><option value="19"><option value="20"><option value="21"><option value="22"><option value="23">
+</datalist>
+<datalist id="minute-options">
+    <option value="00"><option value="05"><option value="10"><option value="15"><option value="20"><option value="25">
+    <option value="30"><option value="35"><option value="40"><option value="45"><option value="50"><option value="55">
+</datalist>
+
+</html>

@@ -268,15 +268,48 @@
         </div>
 
         <div class="section">
+            <h2>休暇申請一覧</h2>
+            <div id="vacationRequestsList" style="margin-bottom: 20px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                            <th style="padding: 10px; text-align: left;">開始日</th>
+                            <th style="padding: 10px; text-align: left;">終了日</th>
+                            <th style="padding: 10px; text-align: left;">種別</th>
+                            <th style="padding: 10px; text-align: left;">ステータス</th>
+                            <th style="padding: 10px; text-align: left;">理由</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vacationRequestsBody">
+                        <tr>
+                            <td colspan="5" style="padding: 20px; text-align: center; color: #999;">申請データがありません</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="section">
             <h2>休暇申請</h2>
             <form id="vacationForm">
                 <div class="form-group">
-                    <label>申請日:</label>
-                    <input type="date" id="vacationDate" required>
+                    <label>開始日: <span style="color: red;">*</span></label>
+                    <input type="date" id="vacationStartDate" required>
+                </div>
+                <div class="form-group">
+                    <label>終了日: <span style="color: #999; font-size: 12px;">(任意)</span></label>
+                    <input type="date" id="vacationEndDate">
                 </div>
                 <div class="form-group">
                     <label>休暇種別:</label>
                     <select id="vacationType" required>
+                        <option value="normal">通常休暇</option>
+                        <option value="paid">有給休暇</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>時間区分:</label>
+                    <select id="vacationTimeType" required>
                         <option value="full">一日休暇</option>
                         <option value="morning">午前休暇</option>
                         <option value="afternoon">午後休暇</option>
@@ -374,8 +407,77 @@
                 document.getElementById('remainingVacation').textContent = (employee.vacation_days || 20) - used;
                 
                 document.getElementById('employeeInfo').style.display = 'block';
+                
+                // 休暇申請一覧も読み込み
+                loadVacationRequests();
             } catch (error) {
                 console.error('従業員情報読み込みエラー:', error);
+            }
+        }
+
+        // 休暇申請一覧を読み込む
+        async function loadVacationRequests() {
+            if (!selectedEmployeeId) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/vacation-requests?employee_id=${selectedEmployeeId}`);
+                const requests = await response.json();
+                
+                const tbody = document.getElementById('vacationRequestsBody');
+                
+                if (!requests || requests.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #999;">申請データがありません</td></tr>';
+                    return;
+                }
+                
+                // ステータスの日本語表示
+                const statusMap = {
+                    'applying': '申請中',
+                    'approved': '承認済',
+                    'rejected': '却下'
+                };
+                
+                // 種別の日本語表示
+                const typeMap = {
+                    'normal': '通常休暇',
+                    'paid': '有給休暇'
+                };
+                
+                // 時間区分の日本語表示
+                const timeTypeMap = {
+                    'full': '一日',
+                    'morning': '午前',
+                    'afternoon': '午後'
+                };
+                
+                tbody.innerHTML = requests.map(req => {
+                    // 種別と時間区分を組み合わせて表示
+                    const vacationType = typeMap[req.type] || req.type || '-';
+                    const timeType = timeTypeMap[req.time_type] || timeTypeMap[req.type] || '-';
+                    const displayType = `${vacationType}（${timeType}）`;
+                    
+                    return `
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 10px;">${req.start_date || req.date || '-'}</td>
+                        <td style="padding: 10px;">${req.end_date || req.date || '-'}</td>
+                        <td style="padding: 10px;">${displayType}</td>
+                        <td style="padding: 10px;">
+                            <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; 
+                                background: ${req.status === 'applying' ? '#fff3cd' : req.status === 'approved' ? '#d4edda' : '#f8d7da'};
+                                color: ${req.status === 'applying' ? '#856404' : req.status === 'approved' ? '#155724' : '#721c24'};">
+                                ${statusMap[req.status] || req.status}
+                            </span>
+                        </td>
+                        <td style="padding: 10px;">${req.reason || '-'}</td>
+                    </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('休暇申請一覧読み込みエラー:', error);
+                const tbody = document.getElementById('vacationRequestsBody');
+                tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #f00;">読み込みエラー</td></tr>';
             }
         }
 
@@ -488,7 +590,7 @@
 
         // 日付選択
         function selectDate(dateStr) {
-            document.getElementById('vacationDate').value = dateStr;
+            document.getElementById('vacationStartDate').value = dateStr;
         }
 
         // 休暇申請
@@ -505,15 +607,44 @@
                 return;
             }
             
-            const date = document.getElementById('vacationDate').value;
+            const startDate = document.getElementById('vacationStartDate').value;
+            const endDate = document.getElementById('vacationEndDate').value;
             const type = document.getElementById('vacationType').value;
+            const timeType = document.getElementById('vacationTimeType').value;
             const reason = document.getElementById('vacationReason').value;
             
-            // 有給残日数チェック
-            const remaining = parseInt(document.getElementById('remainingVacation').textContent);
-            const requestDays = type === 'full' ? 1 : 0.5;
+            // 開始日の入力チェック
+            if (!startDate) {
+                showMessage('開始日を入力してください', 'error');
+                setButtonLoading(submitBtn, false);
+                return;
+            }
             
-            if (remaining < requestDays) {
+            // 終了日が指定されている場合、開始日より後かチェック
+            if (endDate && new Date(endDate) < new Date(startDate)) {
+                showMessage('終了日は開始日以降を指定してください', 'error');
+                setButtonLoading(submitBtn, false);
+                return;
+            }
+            
+            // 有給残日数チェック（有給休暇の場合のみ）
+            const remaining = parseInt(document.getElementById('remainingVacation').textContent);
+            let requestDays;
+            
+            if (endDate) {
+                // 期間が指定されている場合
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                const daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                // 時間区分を考慮
+                requestDays = timeType === 'full' ? daysDiff : daysDiff * 0.5;
+            } else {
+                // 単日の場合
+                requestDays = timeType === 'full' ? 1 : 0.5;
+            }
+            
+            // 有給休暇の場合のみ残日数チェック
+            if (type === 'paid' && remaining < requestDays) {
                 showMessage('有給休暇の残日数が不足しています', 'error');
                 setButtonLoading(submitBtn, false);
                 return;
@@ -524,7 +655,7 @@
                 const confirmationResponse = await fetch(`${API_BASE}/settings/confirmation`);
                 if (confirmationResponse.ok) {
                     const settings = await confirmationResponse.json();
-                    const requestDate = new Date(date);
+                    const requestDate = new Date(startDate);
                     const now = new Date();
                     const confirmationDay = settings.confirmation_day || 25;
                     
@@ -542,9 +673,12 @@
             
             const data = {
                 employee_id: selectedEmployeeId,
-                date: date,
+                start_date: startDate,
+                end_date: endDate || startDate,  // 終了日がなければ開始日と同じ
                 type: type,
-                reason: reason
+                time_type: timeType,  // 時間区分を追加
+                reason: reason,
+                status: 'applying'  // ステータスを申請中に設定
             };
             
             try {
@@ -557,6 +691,7 @@
                 if (response.ok) {
                     showMessage('✓ 休暇申請を送信しました。', 'success');
                     document.getElementById('vacationForm').reset();
+                    loadVacationRequests();  // 休暇一覧を再読み込み
                     updateCalendar();
                     loadEmployeeInfo(); // 有給残日数更新
                 } else {

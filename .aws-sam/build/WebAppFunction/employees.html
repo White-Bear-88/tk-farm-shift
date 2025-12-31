@@ -227,15 +227,39 @@
         </div>
 
         <div class="section">
-            <h2>年間有給休暇日数（規定値）</h2>
-            <div class="form-group">
-                <label>年間有給休暇日数（規定値）:</label>
-                <div style="display: flex; align-items: center; gap: 5px;">
-                    <input type="number" id="defaultVacationDays" min="0" value="20" placeholder="20" style="width: 80px;">
-                    <span>日</span>
-                </div>
+            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                <h2 style="margin: 0;">休暇日数（規定値）</h2>
+                <button onclick="openVacationTypeModal()" style="padding: 8px 16px;">追加</button>
             </div>
-            <button onclick="saveDefaultVacation()">保存</button>
+            <div id="vacationTypesList" style="margin-bottom: 20px;">
+                <div class="form-group" style="display: flex; align-items: center; gap: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px; margin-bottom: 10px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">年間休暇日数</label>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="annualVacationDays" min="0" value="0" placeholder="0" style="width: 80px;">
+                            <span>日</span>
+                        </div>
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">月間休暇日数（上限）</label>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="monthlyVacationLimit" min="0" value="0" placeholder="0" style="width: 80px;">
+                            <span>日</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">年間有給休暇日数</label>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="defaultVacationDays" min="0" value="20" placeholder="20" style="width: 80px;">
+                            <span>日</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="customVacationTypes"></div>
+            </div>
+            <button onclick="saveAllVacationDefaults()">保存</button>
             <div id="vacationDefaultMessage"></div>
         </div>
 
@@ -289,6 +313,43 @@
                     <button type="button" onclick="closeEmployeeModal()">戻る</button>
                 </form>
                 <div id="formMessage"></div>
+            </div>
+        </div>
+
+        <!-- 休暇種別追加モーダル -->
+        <div id="vacationTypeModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeVacationTypeModal()">&times;</span>
+                <h2>休暇種別追加</h2>
+                <form id="vacationTypeForm">
+                    <div class="form-group">
+                        <label>休暇名称: <span style="color: red;">*</span></label>
+                        <input type="text" id="vacationTypeName" required placeholder="例: 夏季休暇">
+                    </div>
+                    <div class="form-group">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <input type="checkbox" id="enableAnnualLimit" onchange="toggleAnnualLimit()">
+                            <label for="enableAnnualLimit">年間取得日数を設定</label>
+                        </div>
+                        <div id="annualLimitInput" style="display: none; margin-left: 30px;">
+                            <input type="number" id="vacationAnnualLimit" min="0" placeholder="0" style="width: 80px;">
+                            <span>日</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <input type="checkbox" id="enableMonthlyLimit" onchange="toggleMonthlyLimit()">
+                            <label for="enableMonthlyLimit">月間取得日数を設定</label>
+                        </div>
+                        <div id="monthlyLimitInput" style="display: none; margin-left: 30px;">
+                            <input type="number" id="vacationMonthlyLimit" min="0" placeholder="0" style="width: 80px;">
+                            <span>日</span>
+                        </div>
+                    </div>
+                    <button type="submit">追加</button>
+                    <button type="button" onclick="closeVacationTypeModal()">キャンセル</button>
+                </form>
+                <div id="vacationTypeFormMessage"></div>
             </div>
         </div>
     </div>
@@ -537,7 +598,116 @@
             return names[taskType] || taskType;
         }
 
-        // 有給休暇デフォルト設定保存
+        // 休暇種別モーダルの開閉
+        function openVacationTypeModal() {
+            document.getElementById('vacationTypeModal').style.display = 'block';
+            document.getElementById('vacationTypeForm').reset();
+            document.getElementById('annualLimitInput').style.display = 'none';
+            document.getElementById('monthlyLimitInput').style.display = 'none';
+        }
+
+        function closeVacationTypeModal() {
+            document.getElementById('vacationTypeModal').style.display = 'none';
+        }
+
+        // チェックボックスで入力欄の表示切替
+        function toggleAnnualLimit() {
+            const checkbox = document.getElementById('enableAnnualLimit');
+            const input = document.getElementById('annualLimitInput');
+            input.style.display = checkbox.checked ? 'block' : 'none';
+            if (!checkbox.checked) {
+                document.getElementById('vacationAnnualLimit').value = '';
+            }
+        }
+
+        function toggleMonthlyLimit() {
+            const checkbox = document.getElementById('enableMonthlyLimit');
+            const input = document.getElementById('monthlyLimitInput');
+            input.style.display = checkbox.checked ? 'block' : 'none';
+            if (!checkbox.checked) {
+                document.getElementById('vacationMonthlyLimit').value = '';
+            }
+        }
+
+        // 休暇種別追加フォーム送信
+        document.getElementById('vacationTypeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('vacationTypeName').value;
+            const enableAnnual = document.getElementById('enableAnnualLimit').checked;
+            const enableMonthly = document.getElementById('enableMonthlyLimit').checked;
+            const annualLimit = enableAnnual ? parseInt(document.getElementById('vacationAnnualLimit').value) : null;
+            const monthlyLimit = enableMonthly ? parseInt(document.getElementById('vacationMonthlyLimit').value) : null;
+            
+            if (!name) {
+                showMessage('vacationTypeFormMessage', 'error', '休暇名称を入力してください');
+                return;
+            }
+            
+            // カスタム休暇種別リストに追加
+            const container = document.getElementById('customVacationTypes');
+            const newItem = document.createElement('div');
+            newItem.className = 'form-group';
+            newItem.style = 'display: flex; align-items: center; gap: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px; margin-bottom: 10px;';
+            
+            let html = `<div style="flex: 1;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">${name}</label>`;
+            
+            if (annualLimit !== null) {
+                html += `<div style="margin-bottom: 5px;">年間: ${annualLimit}日</div>`;
+            }
+            if (monthlyLimit !== null) {
+                html += `<div>月間: ${monthlyLimit}日</div>`;
+            }
+            
+            html += `</div>
+                <button onclick="this.parentElement.remove()" style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">削除</button>`;
+            
+            newItem.innerHTML = html;
+            container.appendChild(newItem);
+            
+            closeVacationTypeModal();
+            showMessage('vacationDefaultMessage', 'success', `✓ ${name}を追加しました。「保存」ボタンを押して確定してください。`);
+        });
+
+        // 全ての休暇設定を保存
+        async function saveAllVacationDefaults() {
+            const annualVacation = parseInt(document.getElementById('annualVacationDays').value) || 0;
+            const monthlyVacationLimit = parseInt(document.getElementById('monthlyVacationLimit').value) || 0;
+            const paidVacation = parseInt(document.getElementById('defaultVacationDays').value) || 20;
+            
+            const button = event.target;
+            const originalText = button.textContent;
+            
+            // スピナー表示
+            button.textContent = '🔄 更新中...';
+            setButtonLoading(button, true);
+
+            try {
+                const response = await fetch(`${API_BASE}/settings/vacation-default`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        annual_vacation_days: annualVacation,
+                        monthly_vacation_limit: monthlyVacationLimit,
+                        default_vacation_days: paidVacation
+                    })
+                });
+                
+                if (response.ok) {
+                    showMessage('vacationDefaultMessage', 'success', '✓ 設定を変更しました。');
+                } else {
+                    throw new Error('設定に失敗しました');
+                }
+            } catch (error) {
+                showMessage('vacationDefaultMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                button.textContent = originalText;
+                setButtonLoading(button, false);
+            }
+        }
+
+        // 有給休暇デフォルト設定保存（後方互換性のため残す）
         async function saveDefaultVacation() {
             const days = parseInt(document.getElementById('defaultVacationDays').value);
             
@@ -580,14 +750,20 @@
                 if (response.ok) {
                     const settings = await response.json();
                     document.getElementById('defaultVacationDays').value = settings.default_vacation_days || 20;
+                    document.getElementById('annualVacationDays').value = settings.annual_vacation_days || 0;
+                    document.getElementById('monthlyVacationLimit').value = settings.monthly_vacation_limit || 0;
                 } else {
                     console.warn('Vacation default settings API returned error, using default value');
                     document.getElementById('defaultVacationDays').value = 20;
+                    document.getElementById('annualVacationDays').value = 0;
+                    document.getElementById('monthlyVacationLimit').value = 0;
                 }
             } catch (error) {
                 console.log('デフォルト有給設定読み込み失敗（エンドポイントなし）:', error);
                 // フォールバック: デフォルト値を使用
                 document.getElementById('defaultVacationDays').value = 20;
+                document.getElementById('annualVacationDays').value = 0;
+                document.getElementById('monthlyVacationLimit').value = 0;
             }
         }
 

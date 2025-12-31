@@ -65,6 +65,7 @@
             border-radius: 5px;
             font-size: 14px;
             text-align: center;
+            box-sizing: border-box;
         }
         textarea {
             height: 80px;
@@ -132,7 +133,7 @@
         }
         .requirement-item {
             display: grid;
-            grid-template-columns: 120px 50px 80px 30px 60px 20px 60px 40px 60px 20px 60px 1fr;
+            grid-template-columns: 120px 50px 110px 20px 60px 20px 60px 40px 60px 20px 60px 1fr;
             align-items: center;
             gap: 5px;
             margin: 10px 0;
@@ -161,7 +162,7 @@
         }
         .requirement-header {
             display: grid;
-            grid-template-columns: 120px 50px 30px 120px 30px 120px 1fr;
+            grid-template-columns: 120px 50px 110px 20px 60px 20px 60px 40px 60px 20px 60px 1fr;
             align-items: center;
             gap: 5px;
             margin: 10px 0;
@@ -214,6 +215,8 @@
         }
         .modal input, .modal textarea, .modal select {
             text-align: left !important;
+            width: calc(100% - 4px);
+            margin: 0 auto;
         }
         /* ローディングコンテナ */
         .loading-container {
@@ -284,6 +287,12 @@
             
             <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
                 <button id="saveMorningRequirementsBtn" onclick="saveMorningRequirements()">保存</button>
+                <div id="morningSaveSpinner" class="loading-container" style="min-height: auto; display: none;">
+                    <div class="spinner-loader">
+                        <div class="spinner"></div>
+                    </div>
+                    <div class="loading-text">更新中</div>
+                </div>
                 <div id="morningRequirementsMessage"></div>
             </div>
             
@@ -305,6 +314,12 @@
             
             <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
                 <button id="saveAfternoonRequirementsBtn" onclick="saveAfternoonRequirements()">保存</button>
+                <div id="afternoonSaveSpinner" class="loading-container" style="min-height: auto; display: none;">
+                    <div class="spinner-loader">
+                        <div class="spinner"></div>
+                    </div>
+                    <div class="loading-text">更新中</div>
+                </div>
                 <div id="afternoonRequirementsMessage"></div>
             </div>
         </div>
@@ -879,10 +894,7 @@
                 tasks.forEach(task => {
                     // この作業ができる従業員を数える
                     const capableEmployees = employees.filter(emp => 
-                        emp.available_tasks && emp.available_tasks.includes(task.task_type)
-                    );
-                    taskCapacity[task.task_type] = capableEmployees.length;
-                });
+                    emp.skills && emp.skills.includes(task.task_type)
                 
                 // taskCapacityをグローバル変数として保存
                 window.taskCapacity = taskCapacity;
@@ -916,7 +928,11 @@
                         <div>作業種別</div>
                         <div>人数</div>
                         <div></div>
-                        <div style="text-align: center;">作業時間</div>
+                        <div></div>
+                        <div colspan="2" style="text-align: center;">作業時間</div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
                         <div></div>
                         <div></div>
                         <div></div>
@@ -928,8 +944,10 @@
                         <input type="number" min="0" max="${taskCapacity[task.task_type] || 0}" 
                                value="${defaults[task.task_type] || task.required_people || 1}" 
                                data-task="${task.task_type}"
+                               oninput="validateTaskRequirement(this, '${task.task_type}')"
                                onchange="validateTaskRequirement(this, '${task.task_type}')">
-                        <span>人 (上限:${taskCapacity[task.task_type] || 0}人)</span>
+                        <span style="white-space: nowrap; font-size: 13px;">人(上限:${taskCapacity[task.task_type] || 0}人)</span>
+                        <span class="error-message" data-error-for="${task.task_type}" style="color: red; font-size: 12px; grid-column: 2 / 4;"></span>
                         <div></div>
                         <select data-task="${task.task_type}" data-field="morning_start_hour" id="morningStartH_${index}" style="width: 60px; text-align: center;"></select>
                         <span>:</span>
@@ -962,7 +980,11 @@
                         <div>作業種別</div>
                         <div>人数</div>
                         <div></div>
-                        <div style="text-align: center;">作業時間</div>
+                        <div></div>
+                        <div colspan="2" style="text-align: center;">作業時間</div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
                         <div></div>
                         <div></div>
                         <div></div>
@@ -974,8 +996,10 @@
                         <input type="number" min="0" max="${taskCapacity[task.task_type] || 0}" 
                                value="${defaults[task.task_type] || task.required_people || 1}" 
                                data-task="${task.task_type}"
+                               oninput="validateTaskRequirement(this, '${task.task_type}')"
                                onchange="validateTaskRequirement(this, '${task.task_type}')">
-                        <span>人 (上限:${taskCapacity[task.task_type] || 0}人)</span>
+                        <span style="white-space: nowrap; font-size: 13px;">人(上限:${taskCapacity[task.task_type] || 0}人)</span>
+                        <span class="error-message" data-error-for="${task.task_type}" style="color: red; font-size: 12px; grid-column: 2 / 4;"></span>
                         <div></div>
                         <select data-task="${task.task_type}" data-field="afternoon_start_hour" id="afternoonStartH_${index}" style="width: 60px; text-align: center;"></select>
                         <span>:</span>
@@ -1082,11 +1106,30 @@
             const value = parseInt(inputElement.value) || 0;
             const maxCapacity = window.taskCapacity ? window.taskCapacity[taskType] : 0;
             
+            // エラーメッセージ要素を取得
+            const errorSpan = inputElement.parentElement.querySelector(`span.error-message[data-error-for="${taskType}"]`);
+            
             if (value > maxCapacity) {
-                alert(`この作業ができる従業員は${maxCapacity}人までです。`);
-                inputElement.value = maxCapacity;
+                // エラーメッセージを表示
+                if (errorSpan) {
+                    errorSpan.textContent = `上限は${maxCapacity}人です`;
+                    errorSpan.style.display = 'block';
+                }
+                inputElement.style.borderColor = 'red';
             } else if (value < 0) {
                 inputElement.value = 0;
+                if (errorSpan) {
+                    errorSpan.textContent = '';
+                    errorSpan.style.display = 'none';
+                }
+                inputElement.style.borderColor = '';
+            } else {
+                // エラーメッセージをクリア
+                if (errorSpan) {
+                    errorSpan.textContent = '';
+                    errorSpan.style.display = 'none';
+                }
+                inputElement.style.borderColor = '';
             }
             
             // 合計人数のバリデーションも実行
@@ -1096,9 +1139,22 @@
         // 午前シフト人数設定保存
         async function saveMorningRequirements() {
             const button = event.target;
-            const originalText = button.textContent;
-            button.textContent = '🔄 更新中...';
-            setButtonLoading(button, true);
+            
+            // エラーがないかチェック
+            const hasErrors = document.querySelectorAll('#morningRequirements .error-message').length > 0 &&
+                            Array.from(document.querySelectorAll('#morningRequirements .error-message')).some(span => span.textContent !== '');
+            
+            if (hasErrors) {
+                alert('上限を超えている項目があります。修正してから保存してください。');
+                return;
+            }
+            
+            // スピナーを表示
+            const spinner = document.getElementById('morningSaveSpinner');
+            const messageDiv = document.getElementById('morningRequirementsMessage');
+            button.disabled = true;
+            spinner.style.display = 'flex';
+            messageDiv.innerHTML = '';
             
             const morningRequirements = {};
             const morningTimes = {};
@@ -1185,20 +1241,30 @@
             } catch (error) {
                 showMessage('morningRequirementsMessage', 'error', `エラー: ${error.message}`);
             } finally {
-                button.textContent = originalText;
-                setButtonLoading(button, false);
+                spinner.style.display = 'none';
+                button.disabled = false;
             }
         }
 
         // 午後シフト人数設定保存
         async function saveAfternoonRequirements() {
             const button = event.target;
-            const originalText = button.textContent;
-            button.textContent = '🔄 更新中...';
-            setButtonLoading(button, true);
             
-            // 更新中表示
-            showMessage('afternoonRequirementsMessage', 'success', '更新中...');
+            // エラーがないかチェック
+            const hasErrors = document.querySelectorAll('#afternoonRequirements .error-message').length > 0 &&
+                            Array.from(document.querySelectorAll('#afternoonRequirements .error-message')).some(span => span.textContent !== '');
+            
+            if (hasErrors) {
+                alert('上限を超えている項目があります。修正してから保存してください。');
+                return;
+            }
+            
+            // スピナーを表示
+            const spinner = document.getElementById('afternoonSaveSpinner');
+            const messageDiv = document.getElementById('afternoonRequirementsMessage');
+            button.disabled = true;
+            spinner.style.display = 'flex';
+            messageDiv.innerHTML = '';
             
             const afternoonRequirements = {};
             const afternoonTimes = {};
@@ -1282,8 +1348,8 @@
             } catch (error) {
                 showMessage('afternoonRequirementsMessage', 'error', `エラー: ${error.message}`);
             } finally {
-                button.textContent = originalText;
-                setButtonLoading(button, false);
+                spinner.style.display = 'none';
+                button.disabled = false;
             }
         }
 
