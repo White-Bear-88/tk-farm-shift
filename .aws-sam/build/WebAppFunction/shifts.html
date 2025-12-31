@@ -400,17 +400,17 @@
                         <div class="form-group">
                             <label>開始時間:</label>
                             <div style="display: flex; gap: 3px; align-items: center;">
-                                <input type="text" id="morningStartHour" style="width: 60px; text-align: center;" list="hour-options">
+                                <select id="morningStartHour" style="width: 60px; text-align: center;"></select>
                                 <span>:</span>
-                                <input type="text" id="morningStartMinute" style="width: 60px; text-align: center;" list="minute-options">
+                                <select id="morningStartMinute" style="width: 60px; text-align: center;"></select>
                             </div>
                         </div>
                         <div class="form-group">
                             <label>終了時間:</label>
                             <div style="display: flex; gap: 3px; align-items: center;">
-                                <input type="text" id="morningEndHour" style="width: 60px; text-align: center;" list="hour-options">
+                                <select id="morningEndHour" style="width: 60px; text-align: center;"></select>
                                 <span>:</span>
-                                <input type="text" id="morningEndMinute" style="width: 60px; text-align: center;" list="minute-options">
+                                <select id="morningEndMinute" style="width: 60px; text-align: center;"></select>
                             </div>
                         </div>
                     </div>
@@ -429,17 +429,17 @@
                         <div class="form-group">
                             <label>開始時間:</label>
                             <div style="display: flex; gap: 3px; align-items: center;">
-                                <input type="text" id="afternoonStartHour" style="width: 60px; text-align: center;" list="hour-options">
+                                <select id="afternoonStartHour" style="width: 60px; text-align: center;"></select>
                                 <span>:</span>
-                                <input type="text" id="afternoonStartMinute" style="width: 60px; text-align: center;" list="minute-options">
+                                <select id="afternoonStartMinute" style="width: 60px; text-align: center;"></select>
                             </div>
                         </div>
                         <div class="form-group">
                             <label>終了時間:</label>
                             <div style="display: flex; gap: 3px; align-items: center;">
-                                <input type="text" id="afternoonEndHour" style="width: 60px; text-align: center;" list="hour-options">
+                                <select id="afternoonEndHour" style="width: 60px; text-align: center;"></select>
                                 <span>:</span>
-                                <input type="text" id="afternoonEndMinute" style="width: 60px; text-align: center;" list="minute-options">
+                                <select id="afternoonEndMinute" style="width: 60px; text-align: center;"></select>
                             </div>
                         </div>
                     </div>
@@ -457,10 +457,10 @@
                     <select id="taskSelect">
                         <option value="">作業を選択</option>
                     </select>
-                    <input type="text" id="startHour" list="hour-options">
-                    <input type="text" id="startMinute" list="minute-options">
-                    <input type="text" id="endHour" list="hour-options">
-                    <input type="text" id="endMinute" list="minute-options">
+                    <select id="startHour"></select>
+                    <select id="startMinute"></select>
+                    <select id="endHour"></select>
+                    <select id="endMinute"></select>
                 </div>
                 
                 <input type="hidden" id="shiftStatus" value="active">
@@ -641,6 +641,38 @@
             return options;
         }
 
+        // selectに時間オプションを追加
+        function populateHourSelect(selectElement, selectedValue = '') {
+            if (!selectElement) return;
+            selectElement.innerHTML = '';
+            const options = generateHourOptions();
+            options.forEach(hour => {
+                const option = document.createElement('option');
+                option.value = hour;
+                option.textContent = hour;
+                if (hour === selectedValue) {
+                    option.selected = true;
+                }
+                selectElement.appendChild(option);
+            });
+        }
+
+        // selectに分オプションを追加（5分刻み）
+        function populateMinuteSelect(selectElement, selectedValue = '') {
+            if (!selectElement) return;
+            selectElement.innerHTML = '';
+            const options = generateMinuteOptions();
+            options.forEach(minute => {
+                const option = document.createElement('option');
+                option.value = minute;
+                option.textContent = minute;
+                if (minute === selectedValue) {
+                    option.selected = true;
+                }
+                selectElement.appendChild(option);
+            });
+        }
+
         // 時間入力のバリデーション
         function validateHourInput(input) {
             const value = input.value.trim();
@@ -668,6 +700,10 @@
             
             // 正しい形式に補正
             input.value = String(hour).padStart(2, '0');
+            
+            // datalistを再生成して全ての候補を表示可能にする
+            refreshDatalist(input, generateHourOptions());
+            
             return true;
         }
 
@@ -699,6 +735,10 @@
             // 5分刻みに補正
             const correctedMinute = Math.round(minute / 5) * 5;
             input.value = String(correctedMinute === 60 ? 0 : correctedMinute).padStart(2, '0');
+            
+            // datalistを再生成して全ての候補を表示可能にする
+            refreshDatalist(input, generateMinuteOptions());
+            
             return true;
         }
 
@@ -725,6 +765,12 @@
             if (selectedValue !== '') {
                 inputElement.value = selectedValue;
             }
+            
+            // プルダウン表示を促進するイベントリスナー
+            inputElement.removeEventListener('click', showDatalistOptions);
+            inputElement.addEventListener('click', showDatalistOptions);
+            inputElement.removeEventListener('focus', showDatalistOptions);
+            inputElement.addEventListener('focus', showDatalistOptions);
             
             // バリデーション設定
             inputElement.removeEventListener('blur', hourBlurHandler);
@@ -759,6 +805,12 @@
                 inputElement.value = selectedValue;
             }
             
+            // プルダウン表示を促進するイベントリスナー
+            inputElement.removeEventListener('click', showDatalistOptions);
+            inputElement.addEventListener('click', showDatalistOptions);
+            inputElement.removeEventListener('focus', showDatalistOptions);
+            inputElement.addEventListener('focus', showDatalistOptions);
+            
             // バリデーション設定
             inputElement.removeEventListener('blur', minuteBlurHandler);
             inputElement.addEventListener('blur', minuteBlurHandler);
@@ -768,36 +820,69 @@
             validateMinuteInput(e.target);
         }
 
-        // 時間文字列（HH:MM）から時と分を分離してinputに設定
-        function setTimeInputs(hourInputId, minuteInputId, timeValue) {
-            const hourInput = document.getElementById(hourInputId);
-            const minuteInput = document.getElementById(minuteInputId);
+        // datalistのプルダウンを表示するためのヘルパー関数
+        function showDatalistOptions(e) {
+            const input = e.target;
             
-            if (timeValue && timeValue.includes(':')) {
-                const [hour, minute] = timeValue.split(':');
-                setupHourInput(hourInput, hour);
-                setupMinuteInput(minuteInput, minute);
-            } else {
-                setupHourInput(hourInput, '');
-                setupMinuteInput(minuteInput, '');
+            // フォーカス時に全選択することでプルダウンを表示
+            setTimeout(() => {
+                input.select();
+            }, 0);
+            
+            // ブラウザがshowPickerをサポートしている場合
+            if (input.showPicker && typeof input.showPicker === 'function') {
+                try {
+                    input.showPicker();
+                } catch (e) {
+                    // showPickerが失敗しても無視
+                }
             }
         }
 
-        // 時と分のinputから時間文字列（HH:MM）を取得
-        function getTimeFromInputs(hourInputId, minuteInputId) {
-            const hour = document.getElementById(hourInputId).value;
-            const minute = document.getElementById(minuteInputId).value;
+        // datalistを再生成する（キーボード入力後も全候補を表示可能にする）
+        function refreshDatalist(inputElement, options) {
+            const datalistId = inputElement.getAttribute('list');
+            if (!datalistId) return;
+            
+            let datalist = document.getElementById(datalistId);
+            if (!datalist) return;
+            
+            // datalistの内容を再生成
+            datalist.innerHTML = '';
+            options.forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                datalist.appendChild(option);
+            });
+        }
+
+        // 時間文字列（HH:MM）から時と分を分離してselectに設定
+        function setTimeSelects(hourSelectId, minuteSelectId, timeValue) {
+            const hourSelect = document.getElementById(hourSelectId);
+            const minuteSelect = document.getElementById(minuteSelectId);
+            
+            if (!hourSelect || !minuteSelect) return;
+            
+            // selectにオプションを追加
+            populateHourSelect(hourSelect);
+            populateMinuteSelect(minuteSelect);
+            
+            if (timeValue && timeValue.includes(':')) {
+                const [hour, minute] = timeValue.split(':');
+                hourSelect.value = hour.padStart(2, '0');
+                minuteSelect.value = minute.padStart(2, '0');
+            }
+        }
+
+        // 時と分のselectから時間文字列（HH:MM）を取得
+        function getTimeFromSelects(hourSelectId, minuteSelectId) {
+            const hour = document.getElementById(hourSelectId)?.value;
+            const minute = document.getElementById(minuteSelectId)?.value;
             if (hour && minute) {
                 return `${hour}:${minute}`;
             }
             return '';
         }
-
-        // 以前の関数名との互換性のため
-        const populateHourSelect = setupHourInput;
-        const populateMinuteSelect = setupMinuteInput;
-        const setTimeSelects = setTimeInputs;
-        const getTimeFromSelects = getTimeFromInputs;
 
         // ボタンの処理中状態を管理
         function setButtonLoading(button, loading) {
@@ -1899,6 +1984,11 @@
         // 作業名変換
         function getTaskName(taskType) {
             const names = {
+                '1': '搾乳',
+                '2': '給餌',
+                '3': '清掃',
+                '4': '見回り',
+                // 後方互換性のため文字列IDも残す
                 'milking': '搾乳',
                 'feeding': '給餌',
                 'cleaning': '清掃',

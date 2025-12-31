@@ -129,7 +129,7 @@
         }
         .requirement-item {
             display: grid;
-            grid-template-columns: 120px 50px 30px 50px 20px 50px 30px 50px 20px 50px 1fr;
+            grid-template-columns: 120px 50px 30px 30px 50px 20px 50px 30px 50px 20px 50px 1fr;
             align-items: center;
             gap: 5px;
             margin: 10px 0;
@@ -144,6 +144,7 @@
         .requirement-item input[type="number"] {
             width: 50px;
             text-align: center;
+            margin-right: 0;
         }
         .requirement-item select {
             width: 100%;
@@ -153,6 +154,7 @@
         }
         .requirement-item .time-separator {
             text-align: center;
+            padding: 0 8px;
         }
         .requirement-header {
             display: grid;
@@ -207,6 +209,9 @@
             font-size: 20px;
             cursor: pointer;
         }
+        .modal input, .modal textarea {
+            text-align: left;
+        }
     </style>
 </head>
 <body>
@@ -229,13 +234,13 @@
             <h3>午前シフト</h3>
             <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6;">
                 <label style="font-weight: bold; margin-right: 10px;">午前シフト時間（規定値）:</label>
-                <input type="text" id="morningShiftStartHour" style="margin-right: 3px; width: 60px; text-align: center;">
+                <select id="morningShiftStartHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
                 <span>:</span>
-                <input type="text" id="morningShiftStartMinute" style="margin-right: 5px; width: 60px; text-align: center;">
+                <select id="morningShiftStartMinute" style="margin-right: 5px; width: 60px; text-align: center;"></select>
                 <span style="margin: 0 5px;">～</span>
-                <input type="text" id="morningShiftEndHour" style="margin-right: 3px; width: 60px; text-align: center;">
+                <select id="morningShiftEndHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
                 <span>:</span>
-                <input type="text" id="morningShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;">
+                <select id="morningShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;"></select>
                 <span style="margin-left: 15px; color: #666; font-size: 14px;">※各作業種別の作業時間の初期値となります</span>
             </div>
             <div id="morningRequirements"></div>
@@ -250,13 +255,13 @@
             <h3>午後シフト</h3>
             <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6;">
                 <label style="font-weight: bold; margin-right: 10px;">午後シフト時間（規定値）:</label>
-                <input type="text" id="afternoonShiftStartHour" style="margin-right: 3px; width: 60px; text-align: center;">
+                <select id="afternoonShiftStartHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
                 <span>:</span>
-                <input type="text" id="afternoonShiftStartMinute" style="margin-right: 5px; width: 60px; text-align: center;">
+                <select id="afternoonShiftStartMinute" style="margin-right: 5px; width: 60px; text-align: center;"></select>
                 <span style="margin: 0 5px;">～</span>
-                <input type="text" id="afternoonShiftEndHour" style="margin-right: 3px; width: 60px; text-align: center;">
+                <select id="afternoonShiftEndHour" style="margin-right: 3px; width: 60px; text-align: center;"></select>
                 <span>:</span>
-                <input type="text" id="afternoonShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;">
+                <select id="afternoonShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;"></select>
                 <span style="margin-left: 15px; color: #666; font-size: 14px;">※各作業種別の作業時間の初期値となります</span>
             </div>
             <div id="afternoonRequirements"></div>
@@ -530,34 +535,33 @@
             });
         }
 
-        // 時間文字列（HH:MM）から時と分を分離してinputに設定
-        function setTimeInputs(hourInputId, minuteInputId, timeValue) {
-            const hourInput = document.getElementById(hourInputId);
-            const minuteInput = document.getElementById(minuteInputId);
+        // 時間文字列（HH:MM）から時と分を分離してselectに設定
+        function setTimeSelects(hourSelectId, minuteSelectId, timeValue) {
+            const hourSelect = document.getElementById(hourSelectId);
+            const minuteSelect = document.getElementById(minuteSelectId);
+            
+            if (!hourSelect || !minuteSelect) return;
+            
+            // selectにオプションを追加
+            populateHourSelect(hourSelect);
+            populateMinuteSelect(minuteSelect);
             
             if (timeValue && timeValue.includes(':')) {
                 const [hour, minute] = timeValue.split(':');
-                setupHourInput(hourInput, hour);
-                setupMinuteInput(minuteInput, minute);
-            } else {
-                setupHourInput(hourInput, '');
-                setupMinuteInput(minuteInput, '');
+                hourSelect.value = hour.padStart(2, '0');
+                minuteSelect.value = minute.padStart(2, '0');
             }
         }
 
-        // 時と分のinputから時間文字列（HH:MM）を取得
-        function getTimeFromInputs(hourInputId, minuteInputId) {
-            const hour = document.getElementById(hourInputId).value;
-            const minute = document.getElementById(minuteInputId).value;
+        // 時と分のselectから時間文字列（HH:MM）を取得
+        function getTimeFromSelects(hourSelectId, minuteSelectId) {
+            const hour = document.getElementById(hourSelectId)?.value;
+            const minute = document.getElementById(minuteSelectId)?.value;
             if (hour && minute) {
                 return `${hour}:${minute}`;
             }
             return '';
         }
-
-        // 互換性のためのエイリアス
-        const setTimeSelects = setTimeInputs;
-        const getTimeFromSelects = getTimeFromInputs;
 
         // ボタンの処理中状態を管理
         function setButtonLoading(button, loading) {
@@ -775,6 +779,11 @@
         // Task icon
         function getTaskIcon(taskType) {
             const icons = {
+                '1': '🥛',
+                '2': '🌾',
+                '3': '🧹',
+                '4': '👀',
+                // 後方互換性のため文字列IDも残す
                 'milking': '🥛',
                 'feeding': '🌾',
                 'cleaning': '🧹',
@@ -858,28 +867,29 @@
                                data-task="${task.task_type}"
                                onchange="validateTotalRequirements()">
                         <span>人</span>
-                        <input type="text" data-task="${task.task_type}" data-field="morning_start_hour" id="morningStartH_${index}" style="width: 50px; text-align: center;">
+                        <div></div>
+                        <select data-task="${task.task_type}" data-field="morning_start_hour" id="morningStartH_${index}" style="width: 60px; text-align: center;"></select>
                         <span>:</span>
-                        <input type="text" data-task="${task.task_type}" data-field="morning_start_minute" id="morningStartM_${index}" style="width: 50px; text-align: center; margin-right: 5px;">
-                        <span class="time-separator" style="margin: 0 5px;">～</span>
-                        <input type="text" data-task="${task.task_type}" data-field="morning_end_hour" id="morningEndH_${index}" style="width: 50px; text-align: center;">
+                        <select data-task="${task.task_type}" data-field="morning_start_minute" id="morningStartM_${index}" style="width: 60px; text-align: center;"></select>
+                        <span class="time-separator">～</span>
+                        <select data-task="${task.task_type}" data-field="morning_end_hour" id="morningEndH_${index}" style="width: 60px; text-align: center;"></select>
                         <span>:</span>
-                        <input type="text" data-task="${task.task_type}" data-field="morning_end_minute" id="morningEndM_${index}" style="width: 50px; text-align: center;">
+                        <select data-task="${task.task_type}" data-field="morning_end_minute" id="morningEndM_${index}" style="width: 60px; text-align: center;"></select>
                         <span></span>
                     </div>
                 `).join('');
                 morningContainer.innerHTML = morningHTML;
                 
-                // 午前シフトのinputを初期化
+                // 午前シフトのselectを初期化
                 tasks.forEach((task, index) => {
                     const startTime = task.morning_start_time || task.recommended_start_time || morningDefaultStart;
                     const endTime = task.morning_end_time || task.recommended_end_time || morningDefaultEnd;
                     const [startH, startM] = startTime.split(':');
                     const [endH, endM] = endTime.split(':');
-                    setupHourInput(document.getElementById(`morningStartH_${index}`), startH);
-                    setupMinuteInput(document.getElementById(`morningStartM_${index}`), startM);
-                    setupHourInput(document.getElementById(`morningEndH_${index}`), endH);
-                    setupMinuteInput(document.getElementById(`morningEndM_${index}`), endM);
+                    populateHourSelect(document.getElementById(`morningStartH_${index}`), startH);
+                    populateMinuteSelect(document.getElementById(`morningStartM_${index}`), startM);
+                    populateHourSelect(document.getElementById(`morningEndH_${index}`), endH);
+                    populateMinuteSelect(document.getElementById(`morningEndM_${index}`), endM);
                 });
                 
                 // 午後シフト人数と作業時間
@@ -902,28 +912,29 @@
                                data-task="${task.task_type}"
                                onchange="validateTotalRequirements()">
                         <span>人</span>
-                        <input type="text" data-task="${task.task_type}" data-field="afternoon_start_hour" id="afternoonStartH_${index}" style="width: 50px; text-align: center;">
+                        <div></div>
+                        <select data-task="${task.task_type}" data-field="afternoon_start_hour" id="afternoonStartH_${index}" style="width: 60px; text-align: center;"></select>
                         <span>:</span>
-                        <input type="text" data-task="${task.task_type}" data-field="afternoon_start_minute" id="afternoonStartM_${index}" style="width: 50px; text-align: center; margin-right: 5px;">
-                        <span class="time-separator" style="margin: 0 5px;">～</span>
-                        <input type="text" data-task="${task.task_type}" data-field="afternoon_end_hour" id="afternoonEndH_${index}" style="width: 50px; text-align: center;">
+                        <select data-task="${task.task_type}" data-field="afternoon_start_minute" id="afternoonStartM_${index}" style="width: 60px; text-align: center;"></select>
+                        <span class="time-separator">～</span>
+                        <select data-task="${task.task_type}" data-field="afternoon_end_hour" id="afternoonEndH_${index}" style="width: 60px; text-align: center;"></select>
                         <span>:</span>
-                        <input type="text" data-task="${task.task_type}" data-field="afternoon_end_minute" id="afternoonEndM_${index}" style="width: 50px; text-align: center;">
+                        <select data-task="${task.task_type}" data-field="afternoon_end_minute" id="afternoonEndM_${index}" style="width: 60px; text-align: center;"></select>
                         <span></span>
                     </div>
                 `).join('');
                 afternoonContainer.innerHTML = afternoonHTML;
                 
-                // 午後シフトのinputを初期化
+                // 午後シフトのselectを初期化
                 tasks.forEach((task, index) => {
                     const startTime = task.afternoon_start_time || afternoonDefaultStart;
                     const endTime = task.afternoon_end_time || afternoonDefaultEnd;
                     const [startH, startM] = startTime.split(':');
                     const [endH, endM] = endTime.split(':');
-                    setupHourInput(document.getElementById(`afternoonStartH_${index}`), startH);
-                    setupMinuteInput(document.getElementById(`afternoonStartM_${index}`), startM);
-                    setupHourInput(document.getElementById(`afternoonEndH_${index}`), endH);
-                    setupMinuteInput(document.getElementById(`afternoonEndM_${index}`), endM);
+                    populateHourSelect(document.getElementById(`afternoonStartH_${index}`), startH);
+                    populateMinuteSelect(document.getElementById(`afternoonStartM_${index}`), startM);
+                    populateHourSelect(document.getElementById(`afternoonEndH_${index}`), endH);
+                    populateMinuteSelect(document.getElementById(`afternoonEndM_${index}`), endM);
                 });
                 
                 // 初期表示時にもチェック

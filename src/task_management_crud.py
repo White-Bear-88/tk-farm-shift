@@ -1,9 +1,16 @@
 import json
 import boto3
 import os
+from decimal import Decimal
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE_NAME'])
+
+def decimal_default(obj):
+    """JSON serialization for Decimal objects"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError
 
 def lambda_handler(event, context):
     try:
@@ -38,29 +45,38 @@ def lambda_handler(event, context):
 
 def get_all_tasks():
     try:
-        response = table.query(
-            KeyConditionExpression='PK = :pk',
-            ExpressionAttributeValues={':pk': 'TASK'}
+        # 新しいデータ構造に対応: TASK#で始まるPKをスキャン
+        response = table.scan(
+            FilterExpression='begins_with(PK, :pk)',
+            ExpressionAttributeValues={':pk': 'TASK#'}
         )
         
         tasks = []
         for item in response['Items']:
-            task = {
-                'task_type': item['SK'],
-                'name': item.get('name', ''),
-                'description': item.get('description', ''),
-                'duration_minutes': int(item.get('duration_minutes', 60)),
-                'required_people': int(item.get('required_people', 1)),
-                'priority': item.get('priority', 'medium'),
-                'recommended_start_time': item.get('recommended_start_time', ''),
-                'recommended_end_time': item.get('recommended_end_time', '')
-            }
-            tasks.append(task)
+            if item['SK'] == 'CONFIG':
+                task = {
+                    'task_type': item.get('task_type', item['PK'].split('#')[1]),
+                    'name': item.get('name', ''),
+                    'description': item.get('description', ''),
+                    'duration_minutes': item.get('duration_minutes', 60),
+                    'required_people': item.get('required_people', 1),
+                    'priority': item.get('priority', 'medium'),
+                    'recommended_start_time': item.get('recommended_start_time', ''),
+                    'recommended_end_time': item.get('recommended_end_time', ''),
+                    'morning_start_time': item.get('morning_start_time', ''),
+                    'morning_end_time': item.get('morning_end_time', ''),
+                    'afternoon_start_time': item.get('afternoon_start_time', ''),
+                    'afternoon_end_time': item.get('afternoon_end_time', '')
+                }
+                tasks.append(task)
+        
+        # IDでソート
+        tasks.sort(key=lambda x: int(x['task_type']) if x['task_type'].isdigit() else 999)
         
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps(tasks)
+            'body': json.dumps(tasks, default=decimal_default)
         }
     except Exception as e:
         return {
@@ -69,67 +85,33 @@ def get_all_tasks():
             'body': json.dumps({'error': str(e)})
         }
 
-def to_task_id(name):
-    # Small mapping for known Japanese names -> ids, fallback to ASCII slug
-    mapping = {
-        '搾乳': 'milking',
-        '給餌': 'feeding',
-        '清掃': 'cleaning',
-        '見回り': 'patrol',
-        '点検': 'maintenance',
-        '健康チェック': 'health_check'
-    }
-    if not name:
-        return ''
-    if name in mapping:
-        return mapping[name]
-    try:
-        import unicodedata
-        norm = unicodedata.normalize('NFKD', name)
-        ascii_only = ''.join([c for c in norm if ord(c) < 128])
-        slug = ''.join([c if c.isalnum() else '_' for c in ascii_only]).strip('_').lower()
-        if slug:
-            return slug
-    except Exception:
-        pass
-    # fallback: replace non word chars
-    return ''.join([c if c.isalnum() else '_' for c in name]).strip('_').lower()
-
-
 def create_task(event):
     try:
         data = json.loads(event['body'])
-        # If task_type not provided, generate from name
-        task_type = data.get('task_type') or to_task_id(data.get('name'))
+        task_type = data.get('task_type')
+        
         if not task_type:
             return {
                 'statusCode': 400,
                 'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps({'error': 'task_type could not be generated'})
+                'body': json.dumps({'error': 'task_type is required'})
             }
-        # Ensure unique task_type: if collision, append numeric suffix until unique
-        base = task_type
-        candidate = base
-        suffix = 0
-        while True:
-            existing = table.get_item(Key={'PK': 'TASK', 'SK': candidate})
-            if not existing.get('Item'):
-                break
-            suffix += 1
-            candidate = f"{base}_{suffix}"
-
-        task_type = candidate
-
+        
         item = {
-            'PK': 'TASK',
-            'SK': task_type,
+            'PK': f'TASK#{task_type}',
+            'SK': 'CONFIG',
+            'task_type': task_type,
             'name': data['name'],
             'description': data.get('description', ''),
             'duration_minutes': data.get('duration_minutes', 60),
             'required_people': data.get('required_people', 1),
             'priority': data.get('priority', 'medium'),
             'recommended_start_time': data.get('recommended_start_time', ''),
-            'recommended_end_time': data.get('recommended_end_time', '')
+            'recommended_end_time': data.get('recommended_end_time', ''),
+            'morning_start_time': data.get('morning_start_time', ''),
+            'morning_end_time': data.get('morning_end_time', ''),
+            'afternoon_start_time': data.get('afternoon_start_time', ''),
+            'afternoon_end_time': data.get('afternoon_end_time', '')
         }
         
         table.put_item(Item=item)
@@ -149,7 +131,7 @@ def create_task(event):
 def get_task(task_type):
     try:
         response = table.get_item(
-            Key={'PK': 'TASK', 'SK': task_type}
+            Key={'PK': f'TASK#{task_type}', 'SK': 'CONFIG'}
         )
         
         if 'Item' not in response:
@@ -161,20 +143,24 @@ def get_task(task_type):
         
         item = response['Item']
         task = {
-            'task_type': item['SK'],
+            'task_type': item.get('task_type', task_type),
             'name': item.get('name', ''),
             'description': item.get('description', ''),
-            'duration_minutes': int(item.get('duration_minutes', 60)),
-            'required_people': int(item.get('required_people', 1)),
+            'duration_minutes': item.get('duration_minutes', 60),
+            'required_people': item.get('required_people', 1),
             'priority': item.get('priority', 'medium'),
             'recommended_start_time': item.get('recommended_start_time', ''),
-            'recommended_end_time': item.get('recommended_end_time', '')
+            'recommended_end_time': item.get('recommended_end_time', ''),
+            'morning_start_time': item.get('morning_start_time', ''),
+            'morning_end_time': item.get('morning_end_time', ''),
+            'afternoon_start_time': item.get('afternoon_start_time', ''),
+            'afternoon_end_time': item.get('afternoon_end_time', '')
         }
         
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps(task)
+            'body': json.dumps(task, default=decimal_default)
         }
     except Exception as e:
         return {
@@ -187,17 +173,32 @@ def update_task(task_type, event):
     try:
         data = json.loads(event['body'])
         
-        item = {
-            'PK': 'TASK',
-            'SK': task_type,
-            'name': data['name'],
-            'description': data.get('description', ''),
-            'duration_minutes': data.get('duration_minutes', 60),
-            'required_people': data.get('required_people', 1),
-            'priority': data.get('priority', 'medium'),
-            'recommended_start_time': data.get('recommended_start_time', ''),
-            'recommended_end_time': data.get('recommended_end_time', '')
-        }
+        # 既存データを取得してマージ
+        response = table.get_item(
+            Key={'PK': f'TASK#{task_type}', 'SK': 'CONFIG'}
+        )
+        
+        if 'Item' not in response:
+            return {
+                'statusCode': 404,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': '作業種別が見つかりません'})
+            }
+        
+        item = response['Item']
+        item.update({
+            'name': data.get('name', item.get('name')),
+            'description': data.get('description', item.get('description', '')),
+            'duration_minutes': data.get('duration_minutes', item.get('duration_minutes', 60)),
+            'required_people': data.get('required_people', item.get('required_people', 1)),
+            'priority': data.get('priority', item.get('priority', 'medium')),
+            'recommended_start_time': data.get('recommended_start_time', item.get('recommended_start_time', '')),
+            'recommended_end_time': data.get('recommended_end_time', item.get('recommended_end_time', '')),
+            'morning_start_time': data.get('morning_start_time', item.get('morning_start_time', '')),
+            'morning_end_time': data.get('morning_end_time', item.get('morning_end_time', '')),
+            'afternoon_start_time': data.get('afternoon_start_time', item.get('afternoon_start_time', '')),
+            'afternoon_end_time': data.get('afternoon_end_time', item.get('afternoon_end_time', ''))
+        })
         
         table.put_item(Item=item)
         
@@ -216,7 +217,7 @@ def update_task(task_type, event):
 def delete_task(task_type):
     try:
         table.delete_item(
-            Key={'PK': 'TASK', 'SK': task_type}
+            Key={'PK': f'TASK#{task_type}', 'SK': 'CONFIG'}
         )
         
         return {
