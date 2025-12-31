@@ -307,7 +307,7 @@
                 </div>
                 <div id="vacationStatsSpinner" style="display: none; color: #666; padding: 10px 0;">
                     <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
-                    <span>更新しています...</span>
+                    <span>読み込み中...</span>
                 </div>
                 <div id="vacationStats" style="padding: 15px; background: #f8f9fa; border-radius: 5px;">
                     <!-- 休暇取得状況統計がここに表示されます -->
@@ -514,6 +514,16 @@
         // 休暇申請一覧を読み込む
         async function loadVacationRequests() {
             if (!selectedEmployeeId) {
+                // 対象がいない場合0日で表示
+                const tbody = document.getElementById('vacationRequestsBody');
+                tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #999;">従業員を選択してください</td></tr>';
+                calculateVacationStats([]);
+                
+                // スピナーを非表示
+                const spinner = document.getElementById('vacationStatsSpinner');
+                const statsDiv = document.getElementById('vacationStats');
+                if (spinner) spinner.style.display = 'none';
+                if (statsDiv) statsDiv.style.display = 'block';
                 return;
             }
             
@@ -527,7 +537,13 @@
                 
                 if (!requests || requests.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #999;">申請データがありません</td></tr>';
-                    document.getElementById('vacationStats').innerHTML = '';
+                    calculateVacationStats([]);
+                    
+                    // スピナーを非表示
+                    const spinner = document.getElementById('vacationStatsSpinner');
+                    const statsDiv = document.getElementById('vacationStats');
+                    if (spinner) spinner.style.display = 'none';
+                    if (statsDiv) statsDiv.style.display = 'block';
                     return;
                 }
                 
@@ -555,7 +571,13 @@
                 
                 if (filteredRequests.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #999;">該当する申請データがありません</td></tr>';
-                    document.getElementById('vacationStats').innerHTML = '';
+                    calculateVacationStats([]);
+                    
+                    // スピナーを非表示
+                    const spinner = document.getElementById('vacationStatsSpinner');
+                    const statsDiv = document.getElementById('vacationStats');
+                    if (spinner) spinner.style.display = 'none';
+                    if (statsDiv) statsDiv.style.display = 'block';
                     return;
                 }
                 
@@ -563,7 +585,8 @@
                 const statusMap = {
                     'applying': '申請中',
                     'approved': '承認済',
-                    'rejected': '却下'
+                    'rejected': '却下',
+                    'withdrawn': '取り下げ'
                 };
                 
                 // 種別の日本語表示
@@ -620,7 +643,13 @@
                 console.error('休暇申請一覧読み込みエラー:', error);
                 const tbody = document.getElementById('vacationRequestsBody');
                 tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #f00;">読み込みエラー</td></tr>';
-                document.getElementById('vacationStats').innerHTML = '';
+                calculateVacationStats([]);
+                
+                // スピナーを非表示
+                const spinner = document.getElementById('vacationStatsSpinner');
+                const statsDiv = document.getElementById('vacationStats');
+                if (spinner) spinner.style.display = 'none';
+                if (statsDiv) statsDiv.style.display = 'block';
             }
         }
 
@@ -1030,7 +1059,70 @@
             }
         });
 
-        // 休暇申請を取り下げ
+        // 休暇取り下げモーダルを開く
+        function openWithdrawVacationModal(requestId, startDate, endDate, vacationType, timeType, status) {
+            document.getElementById('withdrawRequestId').value = requestId;
+            document.getElementById('withdrawStartDate').textContent = startDate;
+            document.getElementById('withdrawEndDate').textContent = endDate;
+            document.getElementById('withdrawVacationType').textContent = vacationType;
+            document.getElementById('withdrawTimeType').textContent = timeType;
+            document.getElementById('withdrawStatus').textContent = status;
+            document.getElementById('withdrawReason').value = '';
+            document.getElementById('withdrawMessage').innerHTML = '';
+            document.getElementById('withdrawVacationModal').style.display = 'block';
+        }
+
+        // 休暇取り下げモーダルを閉じる
+        function closeWithdrawVacationModal() {
+            document.getElementById('withdrawVacationModal').style.display = 'none';
+        }
+
+        // 休暇取り下げを確認して実行
+        async function confirmWithdrawVacation() {
+            const reason = document.getElementById('withdrawReason').value.trim();
+            if (!reason) {
+                showMessage('withdrawMessage', 'error', '取り下げ理由を入力してください');
+                return;
+            }
+
+            if (!confirm('取り下げますか？')) {
+                return;
+            }
+
+            const requestId = document.getElementById('withdrawRequestId').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/vacation-requests/${requestId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        status: 'withdrawn',
+                        withdraw_reason: reason
+                    })
+                });
+
+                if (response.ok) {
+                    closeWithdrawVacationModal();
+                    showMessage('vacationMessage', 'success', '✓ 休暇申請を取り下げました。');
+                    
+                    // 休暇取得状況の更新を表示
+                    const statsSpinner = document.getElementById('vacationStatsSpinner');
+                    const statsDiv = document.getElementById('vacationStats');
+                    if (statsSpinner) statsSpinner.style.display = 'block';
+                    if (statsDiv) statsDiv.style.display = 'none';
+                    
+                    loadVacationRequests(); // 一覧を再読み込み
+                    updateCalendar(); // カレンダーを更新
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '取り下げに失敗しました');
+                }
+            } catch (error) {
+                showMessage('withdrawMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
+        // 休暇申請を取り下げ（旧バージョン - 削除予定）
         async function withdrawVacationRequest(requestId) {
             if (!confirm('この休暇申請を取り下げますか？')) {
                 return;
