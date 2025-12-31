@@ -726,6 +726,7 @@
                 }
 
                 listDiv.innerHTML = tasks.map(task => {
+                    const escapedTaskType = task.task_type.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                     return `
                     <div class="task-card">
                         <h4>
@@ -735,8 +736,8 @@
                         <div class="task-info">
                             <strong>説明:</strong> ${task.description || '未設定'}
                         </div>
-                        <button onclick="editTask('${task.task_type}')">編集</button>
-                        <button class="btn-danger" onclick="deleteTask('${task.task_type}')">削除</button>
+                        <button onclick="editTask('${escapedTaskType}')">編集</button>
+                        <button class="btn-danger" onclick="deleteTask('${escapedTaskType}')">削除</button>
                     </div>
                 `;
                 }).join('');

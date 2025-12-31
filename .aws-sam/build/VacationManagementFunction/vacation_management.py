@@ -125,6 +125,7 @@ def create_vacation_request(event):
         start_date = data.get('start_date')
         end_date = data.get('end_date', start_date)
         vacation_type = data.get('type', 'full')
+        time_type = data.get('time_type', 'full')  # 時間区分を追加
         reason = data.get('reason', '')
         status = data.get('status', 'applying')  # デフォルトは申請中
         
@@ -149,6 +150,7 @@ def create_vacation_request(event):
             'start_date': start_date,
             'end_date': end_date,
             'type': vacation_type,
+            'time_type': time_type,  # 時間区分を保存
             'reason': reason,
             'status': status,
             'created_at': datetime.now().isoformat(),
