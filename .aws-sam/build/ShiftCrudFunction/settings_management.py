@@ -281,7 +281,8 @@ def get_vacation_default():
                     'default_vacation_days': int(response['Item'].get('default_vacation_days', 20)),
                     'annual_vacation_days': int(response['Item'].get('annual_vacation_days', 0)),
                     'monthly_vacation_limit': int(response['Item'].get('monthly_vacation_limit', 0)),
-                    'paid_monthly_limit': int(response['Item'].get('paid_monthly_limit', 0))
+                    'paid_monthly_limit': int(response['Item'].get('paid_monthly_limit', 0)),
+                    'custom_vacation_types': response['Item'].get('custom_vacation_types', [])
                 })
             }
         else:
@@ -293,7 +294,8 @@ def get_vacation_default():
                     'default_vacation_days': 20,
                     'annual_vacation_days': 0,
                     'monthly_vacation_limit': 0,
-                    'paid_monthly_limit': 0
+                    'paid_monthly_limit': 0,
+                    'custom_vacation_types': []
                 })
             }
     except Exception as e:
@@ -306,7 +308,8 @@ def get_vacation_default():
                 'default_vacation_days': 20,
                 'annual_vacation_days': 0,
                 'monthly_vacation_limit': 0,
-                'paid_monthly_limit': 0
+                'paid_monthly_limit': 0,
+                'custom_vacation_types': []
             })
         }
 
@@ -321,7 +324,8 @@ def save_vacation_default(event):
             'default_vacation_days': int(data.get('default_vacation_days', 20)),
             'annual_vacation_days': int(data.get('annual_vacation_days', 0)),
             'monthly_vacation_limit': int(data.get('monthly_vacation_limit', 0)),
-            'paid_monthly_limit': int(data.get('paid_monthly_limit', 0))
+            'paid_monthly_limit': int(data.get('paid_monthly_limit', 0)),
+            'custom_vacation_types': data.get('custom_vacation_types', [])
         }
         
         table.put_item(Item=item)

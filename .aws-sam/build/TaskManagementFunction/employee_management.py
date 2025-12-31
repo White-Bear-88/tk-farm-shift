@@ -58,6 +58,7 @@ def get_all_employees():
             employee = {
                 'employee_id': item['SK'],
                 'name': item.get('name', ''),
+                'kana_name': item.get('kana_name', ''),
                 'phone': item.get('phone', ''),
                 'email': item.get('email', ''),
                 'skills': item.get('skills', []),
@@ -106,6 +107,7 @@ def create_employee(event):
             'PK': 'EMPLOYEE',
             'SK': employee_id,
             'name': data['name'],
+            'kana_name': data.get('kana_name', ''),
             'phone': data.get('phone', ''),
             'email': data.get('email', ''),
             'skills': data.get('skills', []),
@@ -143,6 +145,7 @@ def get_employee(employee_id):
         employee = {
             'employee_id': item['SK'],
             'name': item.get('name', ''),
+            'kana_name': item.get('kana_name', ''),
             'phone': item.get('phone', ''),
             'email': item.get('email', ''),
             'skills': item.get('skills', []),
@@ -169,6 +172,7 @@ def update_employee(employee_id, event):
             'PK': 'EMPLOYEE',
             'SK': employee_id,
             'name': data['name'],
+            'kana_name': data.get('kana_name', ''),
             'phone': data.get('phone', ''),
             'email': data.get('email', ''),
             'skills': data.get('skills', []),

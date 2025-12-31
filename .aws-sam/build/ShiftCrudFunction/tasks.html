@@ -266,7 +266,7 @@
         <div class="section">
             <h2>作業種別一覧</h2>
             <button id="addTaskListBtn" onclick="openTaskModalForAdd()">追加</button>
-            <div id="taskListLoadingContainer" style="display: none; text-align: center; padding: 20px; color: #666;">
+            <div id="taskListLoadingContainer" style="display: none; padding: 20px 0; color: #666;">
                 <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
                 <span>読み込み中...</span>
             </div>
@@ -335,12 +335,16 @@
                 <form id="taskForm">
                     <input type="hidden" id="taskId">
                     <div class="form-group">
-                        <label>作業ID: <small>（自動生成・編集不可）</small></label>
-                        <input type="text" id="taskCode" placeholder="自動生成されます" readonly>
+                        <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
+                            <label style="min-width: 120px;">作業ID: <small>（自動生成・編集不可）</small></label>
+                            <input type="text" id="taskCode" placeholder="自動生成されます" readonly style="width: 150px;">
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label>作業名:</label>
-                        <input type="text" id="taskName" placeholder="例: 搾乳" required>
+                        <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
+                            <label style="min-width: 120px;">作業名:</label>
+                            <input type="text" id="taskName" placeholder="例: 搾乳" required style="flex: 1;">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>作業説明:</label>
