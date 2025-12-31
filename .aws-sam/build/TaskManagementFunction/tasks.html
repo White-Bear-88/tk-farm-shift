@@ -266,12 +266,15 @@
         <div class="section">
             <h2>作業種別一覧</h2>
             <button id="addTaskListBtn" onclick="openTaskModalForAdd()">追加</button>
+            <div id="taskListLoadingContainer" style="display: none; text-align: center; padding: 20px; color: #666;">
+                <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                <span>読み込み中...</span>
+            </div>
             <div id="taskList" class="task-grid"></div>
         </div>
 
         <div class="section">
             <h2>作業人数・作業時間（規定値）</h2>
-            <p style="color: #666; font-size: 14px; margin: 10px 0 20px 0;">※各作業種別の作業時間の初期値となります</p>
             
             <!-- 午前シフト -->
             <h3>午前シフト</h3>
@@ -285,6 +288,7 @@
                 <span>:</span>
                 <select id="morningShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;"></select>
             </div>
+            <p style="color: #666; font-size: 14px; margin: 0 0 15px 0;">※各作業種別の作業時間（午前）の初期値となります</p>
             <div id="morningRequirements"></div>
             <div id="morningValidation" style="margin-top: 10px;"></div>
             
@@ -309,6 +313,7 @@
                 <span>:</span>
                 <select id="afternoonShiftEndMinute" style="margin-right: 10px; width: 60px; text-align: center;"></select>
             </div>
+            <p style="color: #666; font-size: 14px; margin: 0 0 15px 0;">※各作業種別の作業時間（午後）の初期値となります</p>
             <div id="afternoonRequirements"></div>
             <div id="afternoonValidation" style="margin-top: 10px;"></div>
             
@@ -709,38 +714,47 @@
 
         // Load tasks list
         async function loadTasks() {
+            const loadingContainer = document.getElementById('taskListLoadingContainer');
+            const listDiv = document.getElementById('taskList');
+            
             try {
+                // スピナーを表示
+                if (loadingContainer) loadingContainer.style.display = 'block';
+                if (listDiv) listDiv.style.display = 'none';
+                
                 const response = await fetch(`${API_BASE}/tasks`);
                 const tasks = await response.json();
                 
                 // Store current tasks for ID generation
                 currentTasks = tasks;
                 
-                const listDiv = document.getElementById('taskList');
                 if (tasks.length === 0) {
                     listDiv.innerHTML = '<p>登録された作業種別がありません</p>';
-                    return;
-                }
-
-                listDiv.innerHTML = tasks.map(task => {
-                    const escapedTaskType = task.task_type.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    return `
-                    <div class="task-card">
-                        <h4>
-                            <span class="task-icon">${getTaskIcon(task.task_type)}</span>
-                            ${task.name}
-                        </h4>
-                        <div class="task-info">
-                            <strong>説明:</strong> ${task.description || '未設定'}
+                } else {
+                    listDiv.innerHTML = tasks.map(task => {
+                        const escapedTaskType = task.task_type.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        return `
+                        <div class="task-card">
+                            <h4>
+                                <span class="task-icon">${getTaskIcon(task.task_type)}</span>
+                                ${task.name}
+                            </h4>
+                            <div class="task-info">
+                                <strong>説明:</strong> ${task.description || '未設定'}
+                            </div>
+                            <button onclick="editTask('${escapedTaskType}')">編集</button>
+                            <button class="btn-danger" onclick="deleteTask('${escapedTaskType}')">削除</button>
                         </div>
-                        <button onclick="editTask('${escapedTaskType}')">編集</button>
-                        <button class="btn-danger" onclick="deleteTask('${escapedTaskType}')">削除</button>
-                    </div>
-                `;
-                }).join('');
+                    `;
+                    }).join('');
+                }
             } catch (error) {
-                document.getElementById('taskList').innerHTML = 
+                listDiv.innerHTML = 
                     `<div class="error">エラー: ${error.message}</div>`;
+            } finally {
+                // スピナーを非表示
+                if (loadingContainer) loadingContainer.style.display = 'none';
+                if (listDiv) listDiv.style.display = 'grid';
             }
         }
 
@@ -938,7 +952,8 @@
                         <div>作業種別</div>
                         <div>人数</div>
                         <div></div>
-                        <div style="grid-column: span 8; text-align: center;">作業時間</div>
+                        <div></div>
+                        <div style="grid-column: span 8; text-align: center;">作業時間（午前）</div>
                     </div>
                 `;
                 morningHTML += tasks.map((task, index) => `
@@ -985,7 +1000,8 @@
                         <div>作業種別</div>
                         <div>人数</div>
                         <div></div>
-                        <div style="grid-column: span 8; text-align: center;">作業時間</div>
+                        <div></div>
+                        <div style="grid-column: span 8; text-align: center;">作業時間（午後）</div>
                     </div>
                 `;
                 afternoonHTML += tasks.map((task, index) => `

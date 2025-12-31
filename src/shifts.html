@@ -374,9 +374,9 @@
                     <button id="generateShiftBtn" class="btn-success" onclick="generateMonthlyShifts(event, 'both')" title="選択した月のシフトを自動生成します">シフト自動生成</button>
                 </div>
             </div>
-            <div id="calendarLoadingContainer" style="display: none; text-align: center; padding: 20px; color: #666;">
+            <div id="calendarLoadingContainer" style="display: none; color: #666; margin-top: 10px;">
                 <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
-                <span>カレンダーを読み込み中...</span>
+                <span>読み込み中…</span>
             </div>
             <div class="shift-calendar" id="shiftCalendar"></div>
             <div id="calendarMessage"></div>
@@ -1010,7 +1010,7 @@
             // ローディング表示
             const loadingContainer = document.getElementById('calendarLoadingContainer');
             const calendar = document.getElementById('shiftCalendar');
-            if (loadingContainer) loadingContainer.style.display = 'flex';
+            if (loadingContainer) loadingContainer.style.display = 'block';
             if (calendar) calendar.style.display = 'none';
             
             const [year, month] = monthValue.split('-').map(Number);
