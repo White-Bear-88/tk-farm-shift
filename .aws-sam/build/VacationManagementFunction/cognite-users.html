@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CogniteIDユーザー管理</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -185,8 +186,8 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="userEmail">メールアドレス</label>
-                    <input type="email" id="userEmail">
+                    <label for="userEmail">メールアドレス *</label>
+                    <input type="email" id="userEmail" required>
                 </div>
                 <div class="form-group">
                     <label for="userRole">ロール *</label>
@@ -203,8 +204,8 @@
                     </select>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
-                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="submit" class="btn btn-primary">更新</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">戻る</button>
                 </div>
             </form>
         </div>
@@ -285,8 +286,8 @@
                         ${user.is_active ? '有効' : '無効'}
                     </td>
                     <td>
-                        <button class="btn btn-primary" onclick="editUser('${user.cognite_user_id}')">編集</button>
-                        <button class="btn btn-secondary" onclick="deleteUser('${user.cognite_user_id}')">削除</button>
+                        <button onclick="editUser('${user.cognite_user_id}')">編集</button>
+                        <button class="btn-danger" onclick="deleteUser('${user.cognite_user_id}')">削除</button>
                     </td>
                 `;
                 tbody.appendChild(row);

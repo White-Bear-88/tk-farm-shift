@@ -1320,6 +1320,9 @@
                         confirmBtn.style.display = 'inline-block';
                     }
                     
+                    // カレンダーを更新
+                    await updateShiftCalendar();
+                    
                     showMessage('generateMessage', 'success', 'シフトを生成しました。確定ボタンを押してください。');
                 } else {
                     showMessage('generateMessage', 'error', 'シフトが生成されませんでした。従業員データや人数設定を確認してください。');

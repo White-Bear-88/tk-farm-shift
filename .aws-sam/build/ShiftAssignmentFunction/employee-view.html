@@ -558,11 +558,28 @@
         }
 
         // ユーザー情報とロールを取得
-        function getUserInfo() {
-            const userInfoStr = localStorage.getItem('current_user');
-            if (userInfoStr) {
-                return JSON.parse(userInfoStr);
+        async function getUserInfo() {
+            // ローカルストレージからユーザー情報を取得
+            const userInfoStr = localStorage.getItem('user_info');
+            const idToken = localStorage.getItem('cognite_id_token');
+            
+            if (userInfoStr && idToken) {
+                // CogniteIDトークンがある場合
+                const userInfo = JSON.parse(userInfoStr);
+                return {
+                    username: userInfo.name || userInfo.cognite_user_id,
+                    groups: userInfo.role === 'admin' ? ['admin', 'employee'] : ['employee'],
+                    email: userInfo.email,
+                    userProfile: userInfo
+                };
             }
+            
+            // フォールバック: current_userから取得
+            const currentUserStr = localStorage.getItem('current_user');
+            if (currentUserStr) {
+                return JSON.parse(currentUserStr);
+            }
+            
             return null;
         }
 
@@ -577,8 +594,8 @@
         }
 
         // ページ読み込み時の初期化
-        document.addEventListener('DOMContentLoaded', () => {
-            const userInfo = getUserInfo();
+        document.addEventListener('DOMContentLoaded', async () => {
+            const userInfo = await getUserInfo();
             
             // employeeロールのみの場合の処理
             if (userInfo && hasRole(userInfo.groups, 'employee') && !hasRole(userInfo.groups, 'admin')) {
@@ -588,8 +605,14 @@
                 document.getElementById('employeeDisplay').textContent = `${userInfo.username} さん`;
                 document.getElementById('viewOtherShiftsBtn').style.display = 'inline-block';
                 
-                // 自分の従業員IDを設定（usernameを使用）
-                selectedEmployeeId = userInfo.username;
+                // CogniteIDユーザーの場合は紐づけされた従業員IDを使用
+                if (userInfo.userProfile && userInfo.userProfile.employee_info) {
+                    selectedEmployeeId = userInfo.userProfile.employee_info.employee_id;
+                } else {
+                    // フォールバック: usernameを使用
+                    selectedEmployeeId = userInfo.username;
+                }
+                
                 loadEmployeeInfo();
                 updateCalendar();
             }

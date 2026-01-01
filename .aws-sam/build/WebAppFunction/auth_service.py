@@ -42,6 +42,11 @@ def lambda_handler(event, context):
             return verify_jwt_token(json.loads(event['body']))
         elif method == 'GET' and path == '/auth/profile':
             return get_user_profile(event)
+        elif method == 'GET' and '/auth/user-by-sub/' in path:
+            sub = path.split('/')[-1]
+            return get_user_by_sub(sub)
+        elif method == 'GET' and path == '/auth/me':
+            return get_current_user(event)
         
         return {
             'statusCode': 404,
@@ -169,6 +174,106 @@ def get_user_profile(event):
             }
         
         # 従業員情報を取得
+        employee_info = None
+        if cognite_user.get('employee_id'):
+            employee_info = get_employee_by_id(cognite_user['employee_id'])
+        
+        user_profile = {
+            'cognite_user_id': cognite_user['cognite_user_id'],
+            'name': cognite_user['name'],
+            'email': cognite_user['email'],
+            'role': cognite_user['role'],
+            'is_active': cognite_user['is_active'],
+            'employee_info': employee_info
+        }
+        
+        return {
+            'statusCode': 200,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps(user_profile, default=decimal_default)
+        }
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'error': str(e)})
+        }
+
+def get_current_user(event):
+    """現在のユーザー情報を取得（JWTからsubを抽出）"""
+    try:
+        # AuthorizationヘッダーからJWTトークンを取得
+        headers = event.get('headers', {})
+        auth_header = headers.get('Authorization') or headers.get('authorization')
+        
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return {
+                'statusCode': 401,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': 'Authorization header required'})
+            }
+        
+        token = auth_header.replace('Bearer ', '')
+        
+        # JWTトークンをデコード（簡易版、本番では署名検証が必要）
+        try:
+            import jwt
+            decoded = jwt.decode(token, options={"verify_signature": False})
+        except:
+            return {
+                'statusCode': 401,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': 'Invalid token'})
+            }
+        
+        sub = decoded.get('sub')
+        if not sub:
+            return {
+                'statusCode': 401,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': 'Invalid token: no sub claim'})
+            }
+        
+        # subでユーザー情報を取得
+        return get_user_by_sub(sub)
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'error': str(e)})
+        }
+
+def get_user_by_sub(sub):
+    """subをキーにCogniteIDユーザーを検索"""
+    try:
+        # CogniteIDユーザーを検索
+        response = table.get_item(
+            Key={
+                'PK': f'COGNITE_USER#{sub}',
+                'SK': 'PROFILE'
+            }
+        )
+        
+        if 'Item' not in response:
+            return {
+                'statusCode': 404,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': 'User not found'})
+            }
+        
+        item = response['Item']
+        cognite_user = {
+            'cognite_user_id': item['PK'].split('#')[1],
+            'name': item.get('name', ''),
+            'email': item.get('email', ''),
+            'role': item.get('role', 'employee'),
+            'employee_id': item.get('employee_id', ''),
+            'is_active': item.get('is_active', True)
+        }
+        
+        # 従業員情報を取得（紐づけがある場合）
         employee_info = None
         if cognite_user.get('employee_id'):
             employee_info = get_employee_by_id(cognite_user['employee_id'])

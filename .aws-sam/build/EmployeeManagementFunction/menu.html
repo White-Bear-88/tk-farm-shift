@@ -164,30 +164,45 @@
         }
 
         // ユーザー情報とロールを取得
-        function getUserInfo() {
-            const token = localStorage.getItem('cognito_token') || sessionStorage.getItem('cognito_token');
-            if (!token) {
-                // トークンがない場合はログインページにリダイレクト
-                window.location.href = 'login.html';
-                return null;
+        async function getUserInfo() {
+            // ローカルストレージからユーザー情報を取得
+            const userInfoStr = localStorage.getItem('user_info');
+            const idToken = localStorage.getItem('cognite_id_token');
+            
+            if (userInfoStr && idToken) {
+                // CogniteIDトークンがある場合
+                const userInfo = JSON.parse(userInfoStr);
+                return {
+                    username: userInfo.name || userInfo.cognite_user_id,
+                    groups: userInfo.role === 'admin' ? ['admin', 'employee'] : ['employee'],
+                    email: userInfo.email,
+                    userProfile: userInfo
+                };
             }
-
-            const payload = parseJWT(token);
-            if (!payload) {
-                window.location.href = 'login.html';
-                return null;
+            
+            // フォールバック: 開発用トークンをチェック
+            const devToken = localStorage.getItem('cognito_token');
+            if (devToken) {
+                try {
+                    const payload = parseJWT(devToken);
+                    return {
+                        username: payload.username || payload.sub,
+                        groups: payload['cognito:groups'] || [],
+                        email: payload.email
+                    };
+                } catch (error) {
+                    console.error('JWTパースエラー:', error);
+                }
             }
-
-            return {
-                username: payload.username || payload.sub,
-                groups: payload['cognito:groups'] || [],
-                email: payload.email
-            };
+            
+            // トークンがない場合はログイン画面にリダイレクト
+            window.location.href = 'login.html';
+            return null;
         }
 
         // メニュー表示をロールに応じて制御
-        function setupMenu() {
-            const userInfo = getUserInfo();
+        async function setupMenu() {
+            const userInfo = await getUserInfo();
             if (!userInfo) return;
 
             const isAdmin = hasRole(userInfo.groups, 'admin');
@@ -213,9 +228,9 @@
         }
 
         // ページ読み込み時のアニメーションとメニュー設定
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             // メニュー設定を先に実行
-            setupMenu();
+            await setupMenu();
 
             const cards = document.querySelectorAll('.menu-card');
             cards.forEach((card, index) => {

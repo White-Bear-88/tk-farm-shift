@@ -26,10 +26,7 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             width: 400px;
             max-width: 90%;
-        }
-        .login-header {
             text-align: center;
-            margin-bottom: 30px;
         }
         .login-header h1 {
             color: #333;
@@ -38,48 +35,57 @@
         }
         .login-header p {
             color: #666;
-            margin: 0;
+            margin: 0 0 30px 0;
         }
-        .form-group {
+        .login-method {
             margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
         }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+        .login-method h3 {
+            margin: 0 0 15px 0;
             color: #333;
         }
-        input, select {
+        .btn {
             width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-        button {
-            width: 100%;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            border: none;
             padding: 15px;
+            border: none;
             border-radius: 5px;
             font-size: 16px;
             cursor: pointer;
-            margin-top: 20px;
+            margin: 10px 0;
         }
-        button:hover {
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
-        .demo-note {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 20px;
-            font-size: 14px;
-            color: #856404;
+        .divider {
+            margin: 30px 0;
+            text-align: center;
+            position: relative;
+        }
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #ddd;
+        }
+        .divider span {
+            background: white;
+            padding: 0 20px;
+            color: #666;
         }
     </style>
 </head>
@@ -90,75 +96,87 @@
             <p>酪農シフト管理システム</p>
         </div>
 
-        <form id="loginForm">
-            <div class="form-group">
-                <label>ユーザー名:</label>
-                <input type="text" id="username" required>
-            </div>
-            
-            <div class="form-group">
-                <label>ロール（デモ用）:</label>
-                <select id="roleSelect" required>
-                    <option value="">ロールを選択</option>
-                    <option value="admin,employee">管理者（admin + employee）</option>
-                    <option value="employee">従業員（employee のみ）</option>
-                </select>
-            </div>
-            
-            <button type="submit">ログイン</button>
-        </form>
-
-        <div class="demo-note">
-            <strong>デモ用ログイン:</strong><br>
-            実際の運用では CogniteID による認証を使用します。<br>
-            現在はデモ用の簡易ログインです。
+        <div class="login-method">
+            <h3>CogniteID でログイン</h3>
+            <button class="btn btn-primary" onclick="startCogniteLogin()">
+                ログイン
+            </button>
+        </div>
+        
+        <div class="divider" id="devDivider" style="display: none;">
+            <span>開発用</span>
+        </div>
+        
+        <div class="login-method" id="devLogin" style="display: none;">
+            <h3>開発用ログイン</h3>
+            <button class="btn btn-secondary" onclick="location.href='login-dev.html'">
+                開発用ログイン画面
+            </button>
         </div>
     </div>
 
+    <script src="cognite-auth-config.js"></script>
     <script>
-        // デモ用JWTトークン生成
-        function createDemoToken(username, groups) {
-            const header = {
-                "alg": "HS256",
-                "typ": "JWT"
-            };
-            
-            const payload = {
-                "sub": username,
-                "username": username,
-                "cognito:groups": groups,
-                "email": `${username}@example.com`,
-                "iat": Math.floor(Date.now() / 1000),
-                "exp": Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24時間後
-            };
-            
-            // Base64エンコード（デモ用なので署名は省略）
-            const encodedHeader = btoa(JSON.stringify(header));
-            const encodedPayload = btoa(JSON.stringify(payload));
-            
-            return `${encodedHeader}.${encodedPayload}.demo_signature`;
-        }
-
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const roleValue = document.getElementById('roleSelect').value;
-            
-            if (!username || !roleValue) {
-                alert('ユーザー名とロールを入力してください');
-                return;
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 開発環境でのみ開発用ログインを表示
+            if (isDevelopmentMode()) {
+                document.getElementById('devDivider').style.display = 'block';
+                document.getElementById('devLogin').style.display = 'block';
             }
-            
-            const groups = roleValue.split(',');
-            const token = createDemoToken(username, groups);
-            
-            // トークンを保存
-            localStorage.setItem('cognito_token', token);
-            
-            // メニュー画面にリダイレクト
-            window.location.href = 'menu.html';
         });
+        
+        function startCogniteLogin() {
+            const config = getCogniteConfig();
+            
+            // CSRF対策用のstateとnonceを生成
+            const state = generateRandomString(32);
+            const nonce = generateRandomString(32);
+            
+            // セッションストレージに保存
+            sessionStorage.setItem('cognite_auth_state', state);
+            sessionStorage.setItem('cognite_auth_nonce', nonce);
+            
+            // CogniteID認証 URLを構築
+            const authUrl = new URL(`https://${config.TENANT_DOMAIN}/oauth2/authorize`);
+            authUrl.searchParams.set('client_id', config.CLIENT_ID);
+            authUrl.searchParams.set('response_type', config.RESPONSE_TYPE);
+            authUrl.searchParams.set('scope', config.SCOPE);
+            authUrl.searchParams.set('redirect_uri', config.REDIRECT_URI);
+            authUrl.searchParams.set('state', state);
+            authUrl.searchParams.set('nonce', nonce);
+            
+            // CogniteIDログイン画面にリダイレクト
+            window.location.href = authUrl.toString();
+        }
+        
+        function loginWithCogniteID() {
+            const config = getCogniteConfig();
+            
+            // 認証URLを構築
+            const authUrl = new URL(`${config.cogniteDomain}/oauth2/authorize`);
+            authUrl.searchParams.set('client_id', config.clientId);
+            authUrl.searchParams.set('response_type', 'code');
+            authUrl.searchParams.set('scope', config.scope);
+            authUrl.searchParams.set('redirect_uri', config.redirectUri);
+            
+            // 状態パラメータを生成（CSRF対策）
+            const state = generateRandomString(32);
+            localStorage.setItem('cognite_auth_state', state);
+            authUrl.searchParams.set('state', state);
+            
+            // CogniteIDログイン画面にリダイレクト
+            window.location.href = authUrl.toString();
+        }
+        
+        function generateRandomString(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
     </script>
 </body>
 </html>
