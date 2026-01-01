@@ -62,7 +62,8 @@ def get_all_employees():
                 'phone': item.get('phone', ''),
                 'email': item.get('email', ''),
                 'skills': item.get('skills', []),
-                'vacation_days': int(item.get('vacation_days', 20))
+                'vacation_days': int(item.get('vacation_days', 20)),
+                'deleted': item.get('deleted', False)
             }
             employees.append(employee)
         

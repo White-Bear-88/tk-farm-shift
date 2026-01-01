@@ -380,18 +380,18 @@
             <div class="calendar-controls">
                 <div class="month-selector" style="display: flex; align-items: center; gap: 10px;">
                     <label>表示月:</label>
-                    <input type="month" id="calendarMonth" onchange="updateShiftCalendar()" style="width: 160px;">
+                    <input type="month" id="calendarMonth" onchange="updateShiftCalendar()" style="width: 160px; text-align: left;">
                 </div>
                 <div class="auto-generate">
                     <button id="generateShiftBtn" class="btn-success" onclick="generateMonthlyShifts(event, 'both')" title="選択した月のシフトを自動生成します">シフト自動生成</button>
                     <button id="confirmShiftBtn" style="display: none; margin-left: 10px;" onclick="confirmGeneratedShifts()">確定</button>
-                    <span id="generateShiftSpinner" style="display: none; color: #666; margin-left: 10px;">
-                        <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
-                        <span>処理中…</span>
-                    </span>
                 </div>
             </div>
             <div style="margin-top: 10px;">
+                <span id="generateShiftSpinner" style="display: none; color: #666;">
+                    <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                    <span>生成中…</span>
+                </span>
                 <span id="pastMonthMessage" style="color: #dc3545; font-size: 14px;"></span>
             </div>
             <div id="calendarLoadingContainer" style="display: none; color: #666; margin-top: 10px;">
@@ -1237,9 +1237,17 @@
         async function generateMonthlyShifts(event, shiftType = 'both') {
             console.log('シフト自動生成ボタンがクリックされました。shiftType:', shiftType);
             
-            const button = event?.target;
+            // event が undefined の場合の対策
+            if (event && event.preventDefault) {
+                event.preventDefault();
+            }
+            
+            const button = event?.target || document.getElementById('generateShiftBtn');
             const spinner = document.getElementById('generateShiftSpinner');
             const confirmBtn = document.getElementById('confirmShiftBtn');
+            
+            console.log('button:', button);
+            console.log('spinner:', spinner);
             
             if (button) {
                 button.disabled = true;
@@ -1247,6 +1255,7 @@
             }
             if (spinner) {
                 spinner.style.display = 'inline';
+                console.log('スピナーを表示しました');
             }
             
             const monthValue = document.getElementById('calendarMonth').value;
@@ -1659,7 +1668,9 @@
         async function loadEmployees() {
             try {
                 const response = await fetch(`${API_BASE}/employees`);
-                const employees = await response.json();
+                const allEmployees = await response.json();
+                // 削除済み従業員を除外
+                const employees = allEmployees.filter(emp => !emp.deleted);
                 employeesData = employees;
                 
                 // 従業員マップを更新

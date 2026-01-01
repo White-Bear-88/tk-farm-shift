@@ -448,6 +448,10 @@
                             <span style="font-weight: normal;">予定変更</span>
                         </label>
                         <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="withdrawReasonType" value="業務都合" onchange="handleWithdrawReasonTypeChange()" style="width: auto; margin-right: 8px;">
+                            <span style="font-weight: normal;">業務都合</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
                             <input type="radio" name="withdrawReasonType" value="その他" onchange="handleWithdrawReasonTypeChange()" style="width: auto; margin-right: 8px;">
                             <span style="font-weight: normal;">その他</span>
                         </label>
@@ -549,6 +553,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             initYearFilter();
             loadEmployees();
+            loadVacationTypes();
             updateCalendar();
         });
 
@@ -556,7 +561,9 @@
         async function loadEmployees() {
             try {
                 const response = await fetch(`${API_BASE}/employees`);
-                const employees = await response.json();
+                const allEmployees = await response.json();
+                // 削除済み従業員を除外
+                const employees = allEmployees.filter(emp => !emp.deleted);
                 
                 const select = document.getElementById('employeeSelect');
                 select.innerHTML = '<option value="">従業員を選択</option>';
@@ -569,6 +576,32 @@
                 });
             } catch (error) {
                 console.error('従業員読み込みエラー:', error);
+            }
+        }
+
+        // 休暇種別を読み込み
+        async function loadVacationTypes() {
+            try {
+                const response = await fetch(`${API_BASE}/settings/vacation-default`);
+                if (response.ok) {
+                    const settings = await response.json();
+                    const customTypes = settings.custom_vacation_types || [];
+                    
+                    const select = document.getElementById('vacationType');
+                    // デフォルトの選択肢をクリアせずに、カスタム休暇種別のみ追加
+                    
+                    // 削除されていない休暇種別のみを追加
+                    customTypes
+                        .filter(type => !type.deleted)
+                        .forEach(type => {
+                            const option = document.createElement('option');
+                            option.value = type.name;
+                            option.textContent = type.name;
+                            select.appendChild(option);
+                        });
+                }
+            } catch (error) {
+                console.error('休暇種別読み込みエラー:', error);
             }
         }
 
@@ -716,7 +749,10 @@
                     // 申請中または承認済の場合は取り下げボタンを表示
                     let actionButton = '-';
                     if (req.status === 'applying' || req.status === 'approved') {
-                    actionButton = `<button onclick="openWithdrawVacationModal('${req.request_id}', '${req.start_date || req.date}', '${req.end_date || req.date}', '${vacationType}', '${timeType}', '${statusText}', '${(req.reason || '').replace(/'/g, "\\'")}')" style="padding: 5px 15px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">取り下げ</button>`;
+                        actionButton = `<button onclick="openWithdrawVacationModal('${req.request_id}', '${req.start_date || req.date}', '${req.end_date || req.date}', '${vacationType}', '${timeType}', '${statusText}', '${(req.reason || '').replace(/'/g, "\\'")}')" style="padding: 5px 15px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">取り下げ</button>`;
+                    }
+                    
+                    return `
                     <tr style="border-bottom: 1px solid #dee2e6;">
                         <td style="padding: 10px;">${req.start_date || req.date || '-'}</td>
                         <td style="padding: 10px;">${req.end_date || req.date || '-'}</td>

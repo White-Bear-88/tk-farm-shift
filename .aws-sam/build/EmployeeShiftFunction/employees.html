@@ -242,6 +242,15 @@
                 <span>読み込み中...</span>
             </div>
             <div id="employeeList" class="employee-list"></div>
+            
+            <!-- 削除済み従業員 -->
+            <details style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                <summary style="cursor: pointer; font-weight: bold; color: #666; user-select: none;">削除した従業員</summary>
+                <div id="deletedEmployeeList" class="employee-list" style="margin-top: 10px;">
+                    <!-- 削除済み従業員がここに表示されます -->
+                </div>
+            </details>
+            
             <div id="employeeListMessage" style="margin-top: 10px;"></div>
         </div>
 
@@ -284,6 +293,15 @@
                 </div>
                 <div id="customVacationTypes"></div>
             </div>
+            
+            <!-- 削除済み休暇種別 -->
+            <details style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                <summary style="cursor: pointer; font-weight: bold; color: #666; user-select: none;">削除した休暇種別</summary>
+                <div id="deletedVacationTypes" style="margin-top: 10px;">
+                    <!-- 削除済み休暇種別がここに表示されます -->
+                </div>
+            </details>
+            
             <button id="saveVacationDefaultsBtn" onclick="saveAllVacationDefaults()">保存</button>
             <div id="vacationDefaultSpinner" style="display: none; margin-top: 10px;">
                 <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
@@ -324,6 +342,16 @@
                     <select id="vacationAdminFilterEmployee" onchange="loadAllVacationRequests()" style="width: 150px;">
                         <option value="all">全て</option>
                         <!-- 従業員のオプションはJavaScriptで生成 -->
+                    </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="white-space: nowrap;">ステータス：</label>
+                    <select id="vacationAdminFilterStatus" onchange="loadAllVacationRequests()" style="width: 120px;">
+                        <option value="all">全て</option>
+                        <option value="applying">申請中</option>
+                        <option value="approved">承認済</option>
+                        <option value="rejected">却下</option>
+                        <option value="withdrawn">取り下げ</option>
                     </select>
                 </div>
             </div>
@@ -535,6 +563,10 @@
                         <label style="display: flex; align-items: center; cursor: pointer;">
                             <input type="radio" name="withdrawReasonType" value="予定変更" onchange="handleWithdrawReasonTypeChange()" style="width: auto; margin-right: 8px;">
                             <span style="font-weight: normal;">予定変更</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="withdrawReasonType" value="業務都合" onchange="handleWithdrawReasonTypeChange()" style="width: auto; margin-right: 8px;">
+                            <span style="font-weight: normal;">業務都合</span>
                         </label>
                         <label style="display: flex; align-items: center; cursor: pointer;">
                             <input type="radio" name="withdrawReasonType" value="その他" onchange="handleWithdrawReasonTypeChange()" style="width: auto; margin-right: 8px;">
@@ -753,6 +785,7 @@
         async function loadEmployees() {
             const spinner = document.getElementById('employeeListSpinner');
             const listDiv = document.getElementById('employeeList');
+            const deletedListDiv = document.getElementById('deletedEmployeeList');
             
             try {
                 // スピナーを表示
@@ -760,40 +793,71 @@
                 listDiv.style.display = 'none';
                 
                 const response = await fetch(`${API_BASE}/employees`);
-                const employees = await response.json();
+                const allEmployees = await response.json();
                 
-                // 総人数を表示
+                // 有効な従業員と削除済み従業員を分離
+                const activeEmployees = allEmployees.filter(emp => !emp.deleted);
+                const deletedEmployees = allEmployees.filter(emp => emp.deleted);
+                
+                // 総人数を表示（有効な従業員のみ）
                 const countSpan = document.getElementById('employeeCount');
-                countSpan.textContent = `（総人数: ${employees.length}人）`;
+                countSpan.textContent = `（総人数: ${activeEmployees.length}人）`;
                 
                 // スピナーを非表示、リストを表示
                 spinner.style.display = 'none';
                 listDiv.style.display = 'grid';
-                if (employees.length === 0) {
+                
+                // 有効な従業員を表示
+                if (activeEmployees.length === 0) {
                     listDiv.innerHTML = '<p>登録された従業員がありません</p>';
-                    return;
-                }
-
-                listDiv.innerHTML = employees.map(emp => {
-                    const escapedId = emp.employee_id.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    const kanaDisplay = emp.kana_name ? ` (${emp.kana_name})` : '';
-                    return `
-                    <div class="employee-card">
-                        <p style="margin: 0 0 5px 0; font-size: 12px; color: #666;">従業員ID：${emp.employee_id}</p>
-                        <h4 style="margin: 0 0 10px 0;">${emp.name}${kanaDisplay}</h4>
-                        <p><strong>電話:</strong> ${emp.phone || '未設定'}</p>
-                        <p><strong>メール:</strong> ${emp.email || '未設定'}</p>
-                        <p><strong>有給日数:</strong> ${emp.vacation_days || 20}日</p>
-                        <div class="skills">
-                            ${emp.skills ? emp.skills.map(skill => 
-                                `<span class="skill-tag">${getTaskName(skill)}</span>`
-                            ).join('') : ''}
+                } else {
+                    listDiv.innerHTML = activeEmployees.map(emp => {
+                        const escapedId = emp.employee_id.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        const kanaDisplay = emp.kana_name ? ` (${emp.kana_name})` : '';
+                        return `
+                        <div class="employee-card">
+                            <p style="margin: 0 0 5px 0; font-size: 12px; color: #666;">従業員ID：${emp.employee_id}</p>
+                            <h4 style="margin: 0 0 10px 0;">${emp.name}${kanaDisplay}</h4>
+                            <p><strong>電話:</strong> ${emp.phone || '未設定'}</p>
+                            <p><strong>メール:</strong> ${emp.email || '未設定'}</p>
+                            <p><strong>有給日数:</strong> ${emp.vacation_days || 20}日</p>
+                            <div class="skills">
+                                ${emp.skills ? emp.skills.map(skill => 
+                                    `<span class="skill-tag">${getTaskName(skill)}</span>`
+                                ).join('') : ''}
+                            </div>
+                            <button onclick="editEmployee('${escapedId}')">編集</button>
+                            <button class="btn-danger" onclick="deleteEmployee(event, '${escapedId}')">削除</button>
                         </div>
-                        <button onclick="editEmployee('${escapedId}')">編集</button>
-                        <button class="btn-danger" onclick="deleteEmployee('${escapedId}')">削除</button>
-                    </div>
-                    `;
-                }).join('');
+                        `;
+                    }).join('');
+                }
+                
+                // 削除済み従業員を表示
+                if (deletedEmployees.length === 0) {
+                    deletedListDiv.innerHTML = '<p style="color: #999; font-size: 14px; margin: 10px 0;">削除された従業員はありません</p>';
+                } else {
+                    deletedListDiv.style.display = 'grid';
+                    deletedListDiv.innerHTML = deletedEmployees.map(emp => {
+                        const escapedId = emp.employee_id.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        const kanaDisplay = emp.kana_name ? ` (${emp.kana_name})` : '';
+                        return `
+                        <div class="employee-card" style="background: #fff; border: 1px solid #ddd; opacity: 0.8;">
+                            <p style="margin: 0 0 5px 0; font-size: 12px; color: #999;">従業員ID：${emp.employee_id} <span style="color: #dc3545; font-size: 12px;">(削除済み)</span></p>
+                            <h4 style="margin: 0 0 10px 0; color: #999;">${emp.name}${kanaDisplay}</h4>
+                            <p style="color: #999;"><strong>電話:</strong> ${emp.phone || '未設定'}</p>
+                            <p style="color: #999;"><strong>メール:</strong> ${emp.email || '未設定'}</p>
+                            <p style="color: #999;"><strong>有給日数:</strong> ${emp.vacation_days || 20}日</p>
+                            <div class="skills">
+                                ${emp.skills ? emp.skills.map(skill => 
+                                    `<span class="skill-tag" style="background: #ddd; color: #666;">${getTaskName(skill)}</span>`
+                                ).join('') : ''}
+                            </div>
+                            <button onclick="restoreEmployee(event, '${escapedId}')" style="background: #28a745; color: white;">復活</button>
+                        </div>
+                        `;
+                    }).join('');
+                }
             } catch (error) {
                 // エラー時もスピナーを非表示にしてリストを表示
                 spinner.style.display = 'none';
@@ -859,7 +923,7 @@
         }
 
         // 従業員削除
-        async function deleteEmployee(employeeId) {
+        async function deleteEmployee(event, employeeId) {
             if (!confirm('この従業員を削除しますか？')) return;
 
             const button = event.target;
@@ -868,15 +932,102 @@
             setButtonLoading(button, true);
 
             try {
-                const response = await fetch(`${API_BASE}/employees/${employeeId}`, {
-                    method: 'DELETE'
+                // シフトや休暇申請の履歴をチェック
+                let hasHistory = false;
+                
+                // シフト履歴をチェック
+                const shiftsResponse = await fetch(`${API_BASE}/shifts?employee_id=${employeeId}`);
+                if (shiftsResponse.ok) {
+                    const shifts = await shiftsResponse.json();
+                    if (shifts && shifts.length > 0) {
+                        hasHistory = true;
+                    }
+                }
+                
+                // 休暇申請履歴をチェック
+                if (!hasHistory) {
+                    const vacationResponse = await fetch(`${API_BASE}/vacation-requests`);
+                    if (vacationResponse.ok) {
+                        const requests = await vacationResponse.json();
+                        if (requests.some(req => req.employee_id === employeeId)) {
+                            hasHistory = true;
+                        }
+                    }
+                }
+                
+                if (hasHistory) {
+                    // 履歴がある場合は論理削除
+                    if (!confirm(`${employeeId}はシフトまたは休暇申請の履歴があります。\n非表示にしますが、データは保持されます。\nよろしいですか？`)) {
+                        button.textContent = originalText;
+                        setButtonLoading(button, false);
+                        return;
+                    }
+                    
+                    // 論理削除（deletedフラグを追加）
+                    const getResponse = await fetch(`${API_BASE}/employees/${employeeId}`);
+                    const employee = await getResponse.json();
+                    employee.deleted = true;
+                    
+                    const updateResponse = await fetch(`${API_BASE}/employees/${employeeId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(employee)
+                    });
+                    
+                    if (updateResponse.ok) {
+                        showMessage('formMessage', 'success', '✓ 従業員を非表示にしました。');
+                        await loadEmployees();
+                    } else {
+                        throw new Error('削除に失敗しました');
+                    }
+                } else {
+                    // 履歴がない場合は完全削除
+                    const response = await fetch(`${API_BASE}/employees/${employeeId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        showMessage('formMessage', 'success', '✓ 従業員を削除しました。');
+                        await loadEmployees();
+                    } else {
+                        throw new Error('削除に失敗しました');
+                    }
+                }
+            } catch (error) {
+                showMessage('formMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                button.textContent = originalText;
+                setButtonLoading(button, false);
+            }
+        }
+
+        // 従業員を復活
+        async function restoreEmployee(event, employeeId) {
+            if (!confirm(`${employeeId}を復活しますか？`)) return;
+
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '🔄 復活中...';
+            setButtonLoading(button, true);
+
+            try {
+                // 従業員データを取得
+                const getResponse = await fetch(`${API_BASE}/employees/${employeeId}`);
+                const employee = await getResponse.json();
+                
+                // deletedフラグを削除
+                delete employee.deleted;
+                
+                // 更新
+                const updateResponse = await fetch(`${API_BASE}/employees/${employeeId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(employee)
                 });
                 
-                if (response.ok) {
-                    showMessage('formMessage', 'success', '✓ 従業員を削除しました。');
+                if (updateResponse.ok) {
+                    showMessage('formMessage', 'success', `✓ ${employeeId}を復活しました。`);
                     await loadEmployees();
                 } else {
-                    throw new Error('削除に失敗しました');
+                    throw new Error('復活に失敗しました');
                 }
             } catch (error) {
                 showMessage('formMessage', 'error', `エラー: ${error.message}`);
@@ -993,12 +1144,118 @@
                 return;
             }
             
-            // DOM要素を削除
-            button.closest('.form-group').remove();
+            try {
+                // 休暇申請履歴をチェック
+                const response = await fetch(`${API_BASE}/vacation-requests`);
+                if (!response.ok) {
+                    throw new Error('休暇申請データの取得に失敗しました');
+                }
+                
+                const requests = await response.json();
+                const hasHistory = requests.some(req => req.type === name);
+                
+                if (hasHistory) {
+                    // 履歴がある場合は論理削除（非表示化）
+                    if (!confirm(`${name}は過去に使用履歴があります。\n非表示にしますが、データは保持されます。\nよろしいですか？`)) {
+                        return;
+                    }
+                    
+                    // deletedフラグを立てて保存
+                    const formGroup = button.closest('.form-group');
+                    formGroup.dataset.deleted = 'true';
+                    formGroup.style.display = 'none';
+                    
+                    await saveAllVacationDefaults();
+                    showMessage('vacationDefaultMessage', 'success', `✓ ${name}を非表示にしました。`);
+                } else {
+                    // 履歴がない場合は完全削除
+                    button.closest('.form-group').remove();
+                    await saveAllVacationDefaults();
+                    showMessage('vacationDefaultMessage', 'success', `✓ ${name}を削除しました。`);
+                }
+            } catch (error) {
+                showMessage('vacationDefaultMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
+        // 休暇種別を復活
+        async function restoreVacationType(button, name) {
+            if (!confirm(`${name}を復活しますか？`)) {
+                return;
+            }
             
-            // 即座にサーバーに保存
-            await saveAllVacationDefaults();
-            showMessage('vacationDefaultMessage', 'success', `✓ ${name}を削除しました。`);
+            try {
+                // customVacationTypesコンテナから該当の休暇種別を探す
+                const allItems = document.querySelectorAll('#customVacationTypes .form-group');
+                let targetItem = null;
+                
+                allItems.forEach(item => {
+                    const nameEl = item.querySelector('h3');
+                    if (nameEl) {
+                        const itemName = nameEl.textContent.replace(/\s*\(削除済み\)\s*$/, '').trim();
+                        if (itemName === name && item.dataset.deleted === 'true') {
+                            targetItem = item;
+                        }
+                    }
+                });
+                
+                if (targetItem) {
+                    // deletedフラグを解除
+                    delete targetItem.dataset.deleted;
+                    targetItem.style.display = 'block';
+                    targetItem.style.background = '#f8f9fa';
+                    targetItem.style.border = 'none';
+                    
+                    // h3タグから(削除済み)ラベルを削除し、色を復元
+                    const h3 = targetItem.querySelector('h3');
+                    h3.innerHTML = name;
+                    h3.style.color = '';
+                    
+                    // 入力フィールドを有効化し、色を復元
+                    const inputs = targetItem.querySelectorAll('input');
+                    inputs.forEach(input => {
+                        input.disabled = false;
+                    });
+                    
+                    const divs = targetItem.querySelectorAll('div[style*="color"]');
+                    divs.forEach(div => {
+                        if (div.style.color === '#999' || div.style.color === 'rgb(153, 153, 153)') {
+                            div.style.color = '';
+                        }
+                    });
+                    
+                    // 削除ボタンを追加
+                    const buttonContainer = targetItem.querySelector('div[style*="flex"]');
+                    buttonContainer.innerHTML = `<div style="flex: 1;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 16px;">${name}</h3>
+                        <div style="display: flex; gap: 30px; font-size: 14px;">
+                            <div>
+                                <span>年間</span>
+                                <input type="number" class="custom-vacation-annual" data-name="${name}" min="0" value="${targetItem.querySelector('.custom-vacation-annual').value}" placeholder="0" style="width: 60px; margin: 0 5px;">
+                                <span>日まで</span>
+                            </div>
+                            <div>
+                                <span>月間</span>
+                                <input type="number" class="custom-vacation-monthly" data-name="${name}" min="0" value="${targetItem.querySelector('.custom-vacation-monthly').value}" placeholder="0" style="width: 60px; margin: 0 5px;">
+                                <span>日まで</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="deleteVacationType(this, '${name}')" style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">削除</button>`;
+                    
+                    // 保存
+                    await saveAllVacationDefaults();
+                    
+                    // 削除済みセクションを再読み込み
+                    await loadDefaultVacation();
+                    
+                    showMessage('vacationDefaultMessage', 'success', `✓ ${name}を復活しました。`);
+                } else {
+                    showMessage('vacationDefaultMessage', 'error', '復活対象の休暇種別が見つかりませんでした。');
+                }
+            } catch (error) {
+                showMessage('vacationDefaultMessage', 'error', `エラー: ${error.message}`);
+            }
         }
 
         // 全ての休暇設定を保存
@@ -1014,12 +1271,15 @@
                 const nameEl = item.querySelector('h3');
                 const annualInput = item.querySelector('.custom-vacation-annual');
                 const monthlyInput = item.querySelector('.custom-vacation-monthly');
+                const deleted = item.dataset.deleted === 'true';
                 
                 if (nameEl && annualInput && monthlyInput) {
+                    const name = nameEl.textContent.replace(/\s*\(削除済み\)\s*$/, '').trim();
                     customVacationTypes.push({
-                        name: nameEl.textContent.trim(),
+                        name: name,
                         annual_limit: parseInt(annualInput.value) || 0,
-                        monthly_limit: parseInt(monthlyInput.value) || 0
+                        monthly_limit: parseInt(monthlyInput.value) || 0,
+                        deleted: deleted
                     });
                 }
             });
@@ -1120,9 +1380,15 @@
                     // カスタム休暇種別を表示
                     const customTypes = settings.custom_vacation_types || [];
                     const container = document.getElementById('customVacationTypes');
+                    const deletedContainer = document.getElementById('deletedVacationTypes');
                     container.innerHTML = ''; // 既存の内容をクリア
+                    deletedContainer.innerHTML = ''; // 削除済みコンテナもクリア
                     
-                    customTypes.forEach(customType => {
+                    const activeTypes = customTypes.filter(t => !t.deleted);
+                    const deletedTypes = customTypes.filter(t => t.deleted);
+                    
+                    // アクティブな休暇種別を表示
+                    activeTypes.forEach(customType => {
                         const newItem = document.createElement('div');
                         newItem.className = 'form-group';
                         newItem.style = 'padding: 15px; background: #f8f9fa; border-radius: 5px; margin-bottom: 10px;';
@@ -1149,6 +1415,46 @@
                         newItem.innerHTML = html;
                         container.appendChild(newItem);
                     });
+                    
+                    // 削除済み休暇種別を表示
+                    if (deletedTypes.length === 0) {
+                        deletedContainer.innerHTML = '<p style="color: #999; font-size: 14px; margin: 5px 0;">削除された休暇種別はありません</p>';
+                    } else {
+                        deletedTypes.forEach(customType => {
+                            const newItem = document.createElement('div');
+                            newItem.className = 'form-group';
+                            newItem.style = 'padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px; display: none;';
+                            newItem.dataset.deleted = 'true';
+                            
+                            let html = `<div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="flex: 1;">
+                                    <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #999;">${customType.name} <span style="color: #dc3545; font-size: 12px;">(削除済み)</span></h3>
+                                    <div style="display: flex; gap: 30px; font-size: 14px; color: #999;">
+                                        <div>
+                                            <span>年間</span>
+                                            <input type="number" class="custom-vacation-annual" data-name="${customType.name}" min="0" value="${customType.annual_limit}" placeholder="0" style="width: 60px; margin: 0 5px;" disabled>
+                                            <span>日まで</span>
+                                        </div>
+                                        <div>
+                                            <span>月間</span>
+                                            <input type="number" class="custom-vacation-monthly" data-name="${customType.name}" min="0" value="${customType.monthly_limit}" placeholder="0" style="width: 60px; margin: 0 5px;" disabled>
+                                            <span>日まで</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button onclick="restoreVacationType(this, '${customType.name}')" style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">復活</button>
+                            </div>`;
+                            
+                            newItem.innerHTML = html;
+                            // 削除済みはcustomVacationTypesコンテナにも追加（保存用）
+                            container.appendChild(newItem);
+                            
+                            // 表示用のクローンを削除済みコンテナに追加
+                            const displayItem = newItem.cloneNode(true);
+                            displayItem.style.display = 'block';
+                            deletedContainer.appendChild(displayItem);
+                        });
+                    }
                 } else {
                     console.warn('Vacation default settings API returned error, using default value');
                     document.getElementById('defaultVacationDays').value = 10;
@@ -1259,6 +1565,7 @@
                 const filterYear = document.getElementById('vacationAdminFilterYear').value;
                 const filterMonth = document.getElementById('vacationAdminFilterMonth').value;
                 const filterEmployee = document.getElementById('vacationAdminFilterEmployee').value;
+                const filterStatus = document.getElementById('vacationAdminFilterStatus').value;
                 
                 filteredRequests = filteredRequests.filter(req => {
                     const startDate = new Date(req.start_date || req.date);
@@ -1277,6 +1584,11 @@
                     
                     // 従業員名でフィルタ
                     if (filterEmployee !== 'all' && req.employee_id !== filterEmployee) {
+                        return false;
+                    }
+                    
+                    // ステータスでフィルタ
+                    if (filterStatus !== 'all' && req.status !== filterStatus) {
                         return false;
                     }
                     
