@@ -383,15 +383,15 @@
                     <input type="month" id="calendarMonth" onchange="updateShiftCalendar()" style="width: 160px; text-align: left;">
                 </div>
                 <div class="auto-generate">
+                    <span id="generateShiftSpinner" style="display: none; color: #666; margin-right: 10px;">
+                        <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                        <span>生成中…</span>
+                    </span>
                     <button id="generateShiftBtn" class="btn-success" onclick="generateMonthlyShifts(event, 'both')" title="選択した月のシフトを自動生成します">シフト自動生成</button>
                     <button id="confirmShiftBtn" style="display: none; margin-left: 10px;" onclick="confirmGeneratedShifts()">確定</button>
                 </div>
             </div>
             <div style="margin-top: 10px;">
-                <span id="generateShiftSpinner" style="display: none; color: #666;">
-                    <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
-                    <span>生成中…</span>
-                </span>
                 <span id="pastMonthMessage" style="color: #dc3545; font-size: 14px;"></span>
             </div>
             <div id="calendarLoadingContainer" style="display: none; color: #666; margin-top: 10px;">
@@ -1214,18 +1214,30 @@
             
             // UIにない場合はAPIから取得
             try {
-                const response = await fetch(`${API_BASE}/requirements/global-default`);
+                const response = await fetch(`${API_BASE}/tasks`);
                 if (response.ok) {
-                    const data = await response.json();
-                    console.log('APIから取得した人数設定:', data);
-                    return data;
+                    const tasks = await response.json();
+                    const requirements = {};
+                    tasks.forEach(task => {
+                        requirements[task.task_type] = {
+                            morning: task.morning_required_count || 1,
+                            afternoon: task.afternoon_required_count || 1
+                        };
+                    });
+                    console.log('APIから取得した人数設定:', requirements);
+                    return requirements;
                 }
             } catch (error) {
                 console.error('デフォルト人数取得エラー:', error);
             }
             
             // フォールバック：デフォルト値
-            const fallback = {'milking': 2, 'feeding': 1, 'cleaning': 1, 'patrol': 1};
+            const fallback = {
+                '1': {morning: 2, afternoon: 2}, // 搾乳
+                '2': {morning: 1, afternoon: 1}, // 給餌
+                '3': {morning: 1, afternoon: 1}, // 清掃
+                '4': {morning: 1, afternoon: 1}  // 見回り
+            };
             console.log('フォールバック人数設定を使用:', fallback);
             return fallback;
         }
@@ -1328,68 +1340,80 @@
         
         // ローカルでシフトを生成
         async function generateShiftsLocally(monthValue) {
-            // 従業員データ取得
-            const employeesRes = await fetch(`${API_BASE}/employees`);
-            const employees = await employeesRes.json();
-            
-            // 作業種別取得
-            const tasksRes = await fetch(`${API_BASE}/tasks`);
-            const tasks = await tasksRes.json();
-            
-            // 休暇申請取得
-            const vacationsRes = await fetch(`${API_BASE}/vacation-requests`);
-            const vacations = await vacationsRes.json();
-            
-            // 必要人数取得
-            const requirements = await getCurrentDefaultRequirements();
-            
-            // その月の全日を取得
-            const [year, month] = monthValue.split('-').map(Number);
-            const daysInMonth = new Date(year, month, 0).getDate();
-            
-            const shifts = [];
-            
-            for (let day = 1; day <= daysInMonth; day++) {
-                const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            try {
+                // 従業員データ取得
+                const employeesRes = await fetch(`${API_BASE}/employees`);
+                const employees = await employeesRes.json();
                 
-                // その日に利用可能な従業員（休暇申請がない従業員）
-                const availableEmployees = employees.filter(emp => {
-                    const hasVacation = vacations.some(vac => 
-                        vac.employee_id === emp.employee_id && 
-                        vac.status === 'approved' &&
-                        date >= vac.start_date && date <= (vac.end_date || vac.start_date)
-                    );
-                    return !hasVacation;
-                });
+                // 作業種別取得
+                const tasksRes = await fetch(`${API_BASE}/tasks`);
+                const tasks = await tasksRes.json();
                 
-                // 午前シフト割り当て
-                const morningAssignments = assignShifts(availableEmployees, tasks, requirements, 'morning');
-                morningAssignments.forEach(assignment => {
-                    shifts.push({
-                        date: date,
-                        employee_id: assignment.employee_id,
-                        shift_type: 'morning',
-                        task_type: assignment.task_type,
-                        start_time: assignment.start_time,
-                        end_time: assignment.end_time
+                // 休暇申請取得
+                let vacations = [];
+                try {
+                    const vacationsRes = await fetch(`${API_BASE}/vacation-requests`);
+                    if (vacationsRes.ok) {
+                        vacations = await vacationsRes.json();
+                    }
+                } catch (error) {
+                    console.warn('休暇申請データ取得エラー:', error);
+                }
+                
+                // 必要人数取得
+                const requirements = await getCurrentDefaultRequirements();
+                
+                // その月の全日を取得
+                const [year, month] = monthValue.split('-').map(Number);
+                const daysInMonth = new Date(year, month, 0).getDate();
+                
+                const shifts = [];
+                
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    
+                    // その日に利用可能な従業員（休暇申請がない従業員）
+                    const availableEmployees = employees.filter(emp => {
+                        const hasVacation = vacations.some(vac => 
+                            vac.employee_id === emp.employee_id && 
+                            vac.status === 'approved' &&
+                            date >= vac.start_date && date <= (vac.end_date || vac.start_date)
+                        );
+                        return !hasVacation;
                     });
-                });
-                
-                // 午後シフト割り当て（午前と同じメンバーを優先）
-                const afternoonAssignments = assignShifts(availableEmployees, tasks, requirements, 'afternoon', morningAssignments.map(a => a.employee_id));
-                afternoonAssignments.forEach(assignment => {
-                    shifts.push({
-                        date: date,
-                        employee_id: assignment.employee_id,
-                        shift_type: 'afternoon',
-                        task_type: assignment.task_type,
-                        start_time: assignment.start_time,
-                        end_time: assignment.end_time
+                    
+                    // 午前シフト割り当て
+                    const morningAssignments = assignShifts(availableEmployees, tasks, requirements, 'morning');
+                    morningAssignments.forEach(assignment => {
+                        shifts.push({
+                            date: date,
+                            employee_id: assignment.employee_id,
+                            shift_time: 'morning',
+                            task_type: assignment.task_type,
+                            start_time: assignment.start_time,
+                            end_time: assignment.end_time
+                        });
                     });
-                });
+                    
+                    // 午後シフト割り当て（午前と同じメンバーを優先）
+                    const afternoonAssignments = assignShifts(availableEmployees, tasks, requirements, 'afternoon', morningAssignments.map(a => a.employee_id));
+                    afternoonAssignments.forEach(assignment => {
+                        shifts.push({
+                            date: date,
+                            employee_id: assignment.employee_id,
+                            shift_time: 'afternoon',
+                            task_type: assignment.task_type,
+                            start_time: assignment.start_time,
+                            end_time: assignment.end_time
+                        });
+                    });
+                }
+                
+                return shifts;
+            } catch (error) {
+                console.error('シフト生成エラー:', error);
+                throw error;
             }
-            
-            return shifts;
         }
         
         // シフト割り当てロジック
@@ -1399,12 +1423,30 @@
             
             // 作業種別ごとに割り当て
             tasks.forEach(task => {
-                const requiredCount = requirements[task.task_type] || 0;
+                const taskRequirement = requirements[task.task_type];
+                let requiredCount = 0;
+                
+                if (taskRequirement) {
+                    if (typeof taskRequirement === 'object') {
+                        requiredCount = taskRequirement[shiftType] || 0;
+                    } else {
+                        requiredCount = taskRequirement || 0;
+                    }
+                }
+                
                 if (requiredCount === 0) return;
                 
-                // この作業ができる従業員
+                // この作業ができる従業員（新旧IDマッピング対応）
+                const taskIdMapping = {
+                    '1': 'milking',
+                    '2': 'feeding', 
+                    '3': 'cleaning',
+                    '4': 'patrol'
+                };
+                const oldTaskId = taskIdMapping[task.task_type] || task.task_type;
+                
                 const capableEmployees = availableEmployees.filter(emp => 
-                    emp.skills && emp.skills.includes(task.task_type) && !assignedEmployees.has(emp.employee_id)
+                    emp.skills && (emp.skills.includes(task.task_type) || emp.skills.includes(oldTaskId)) && !assignedEmployees.has(emp.employee_id)
                 );
                 
                 // 優先従業員（午前と午後で同じメンバー）
@@ -1538,12 +1580,12 @@
                 const response = await fetch(`${API_BASE}/shifts/by-month/${month}`);
                 if (response.ok) {
                     const shifts = await response.json();
-                    return shifts.length;
+                    return shifts;
                 }
             } catch (error) {
                 console.error('既存シフトチェックエラー:', error);
             }
-            return 0;
+            return [];
         }
 
         // Apply preview to calendar (client-side) — do not write to DB until user confirms

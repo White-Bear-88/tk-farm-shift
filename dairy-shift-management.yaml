@@ -213,7 +213,7 @@ Resources:
     Properties:
       FunctionName: !Sub 'dairy-task-management-${Environment}'
       CodeUri: src/
-      Handler: task_management_crud.lambda_handler
+      Handler: task_management.lambda_handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ShiftManagementTable
@@ -353,6 +353,70 @@ Resources:
             RestApiId: !Ref ShiftManagementApi
             Path: /vacation-requests/{request_id}
             Method: DELETE
+
+  CogniteUserManagementFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'dairy-cognite-user-management-${Environment}'
+      CodeUri: src/
+      Handler: cognite_user_management.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ShiftManagementTable
+      Events:
+        GetCogniteUsers:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /cognite-users
+            Method: GET
+        CreateCogniteUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /cognite-users
+            Method: POST
+        GetCogniteUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /cognite-users/{id}
+            Method: GET
+        UpdateCogniteUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /cognite-users/{id}
+            Method: PUT
+        DeleteCogniteUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /cognite-users/{id}
+            Method: DELETE
+
+  AuthServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'dairy-auth-service-${Environment}'
+      CodeUri: src/
+      Handler: auth_service.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ShiftManagementTable
+      Events:
+        VerifyToken:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /auth/verify
+            Method: POST
+        GetProfile:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /auth/profile
+            Method: GET
 
 Outputs:
   WebAppUrl:

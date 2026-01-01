@@ -12,6 +12,13 @@ else:
 
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
+def get_cors_headers():
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+    }
+
 def decimal_default(obj):
     """JSON serialization for Decimal objects"""
     if isinstance(obj, Decimal):
@@ -22,6 +29,13 @@ def lambda_handler(event, context):
     try:
         method = event['httpMethod']
         path = event.get('path', '')
+        
+        if method == 'OPTIONS':
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': ''
+            }
         
         if method == 'GET':
             if '/tasks/' in path:
@@ -42,14 +56,14 @@ def lambda_handler(event, context):
         
         return {
             'statusCode': 405,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': 'Method not allowed'})
         }
         
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -94,7 +108,7 @@ def get_tasks():
     
     return {
         'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
+        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
         'body': json.dumps(tasks, default=decimal_default)
     }
 
@@ -111,7 +125,7 @@ def get_task(task_id):
         if 'Item' not in response:
             return {
                 'statusCode': 404,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': 'Task not found'})
             }
         
@@ -133,14 +147,14 @@ def get_task(task_id):
         
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps(task, default=decimal_default)
         }
         
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -172,14 +186,14 @@ def create_task(data):
         
         return {
             'statusCode': 201,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'message': 'Task created successfully', 'task_type': task_type})
         }
         
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -197,7 +211,7 @@ def update_task(task_id, data):
         if 'Item' not in response:
             return {
                 'statusCode': 404,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': 'Task not found'})
             }
         
@@ -221,14 +235,14 @@ def update_task(task_id, data):
         
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'message': 'Task updated successfully'})
         }
         
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -244,13 +258,13 @@ def delete_task(task_id):
         
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'message': 'Task deleted successfully'})
         }
         
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }

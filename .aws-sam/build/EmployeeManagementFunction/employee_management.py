@@ -12,10 +12,25 @@ else:
 
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
+def get_cors_headers():
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+    }
+
 def lambda_handler(event, context):
     try:
         http_method = event['httpMethod']
         path = event['path']
+        
+        # OPTIONSリクエストのCORS対応
+        if http_method == 'OPTIONS':
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': ''
+            }
         
         if http_method == 'GET' and path == '/employees':
             return get_all_employees()
@@ -36,13 +51,13 @@ def lambda_handler(event, context):
         else:
             return {
                 'statusCode': 404,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': 'Not found'})
             }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -63,19 +78,20 @@ def get_all_employees():
                 'email': item.get('email', ''),
                 'skills': item.get('skills', []),
                 'vacation_days': int(item.get('vacation_days', 20)),
+                'cognite_user_id': item.get('cognite_user_id', ''),
                 'deleted': item.get('deleted', False)
             }
             employees.append(employee)
         
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps(employees)
         }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -112,20 +128,21 @@ def create_employee(event):
             'phone': data.get('phone', ''),
             'email': data.get('email', ''),
             'skills': data.get('skills', []),
-            'vacation_days': data.get('vacation_days', 20)
+            'vacation_days': data.get('vacation_days', 20),
+            'cognite_user_id': data.get('cognite_user_id', '')
         }
         
         table.put_item(Item=item)
         
         return {
             'statusCode': 201,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'message': '従業員を作成しました', 'employee_id': employee_id})
         }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -138,7 +155,7 @@ def get_employee(employee_id):
         if 'Item' not in response:
             return {
                 'statusCode': 404,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': '従業員が見つかりません'})
             }
         
@@ -150,18 +167,19 @@ def get_employee(employee_id):
             'phone': item.get('phone', ''),
             'email': item.get('email', ''),
             'skills': item.get('skills', []),
-            'vacation_days': int(item.get('vacation_days', 20))
+            'vacation_days': int(item.get('vacation_days', 20)),
+            'cognite_user_id': item.get('cognite_user_id', '')
         }
         
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps(employee)
         }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -177,20 +195,21 @@ def update_employee(employee_id, event):
             'phone': data.get('phone', ''),
             'email': data.get('email', ''),
             'skills': data.get('skills', []),
-            'vacation_days': data.get('vacation_days', 20)
+            'vacation_days': data.get('vacation_days', 20),
+            'cognite_user_id': data.get('cognite_user_id', '')
         }
         
         table.put_item(Item=item)
         
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'message': '従業員を更新しました'})
         }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -202,13 +221,13 @@ def delete_employee(employee_id):
         
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'message': '従業員を削除しました'})
         }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -217,12 +236,12 @@ def get_vacation_used(employee_id):
         # 今年の有給使用日数を計算（実装簡略化のため0を返す）
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'used_days': 0})
         }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }

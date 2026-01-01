@@ -237,6 +237,7 @@
             <div style="margin-bottom: 20px;">
                 <button onclick="openEmployeeModal()">従業員追加</button>
             </div>
+            <div id="employeeListMessage" style="margin-bottom: 10px;"></div>
             <div id="employeeListSpinner" style="display: block; padding: 20px 0; color: #666;">
                 <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
                 <span>読み込み中...</span>
@@ -251,7 +252,14 @@
                 </div>
             </details>
             
-            <div id="employeeListMessage" style="margin-top: 10px;"></div>
+            <!-- 削除した従業員セクション -->
+            <div style="margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
+                <div style="cursor: pointer; padding: 10px; background: #f8f9fa; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;" onclick="toggleDeletedEmployees()">
+                    <h3 style="margin: 0; color: #666;">削除した従業員 <span id="deletedEmployeeCount" style="font-size: 0.8em;"></span></h3>
+                    <span id="deletedToggleIcon" style="font-size: 1.2em;">▼</span>
+                </div>
+                <div id="deletedEmployeeList" style="display: none; margin-top: 10px;"></div>
+            </div>
         </div>
 
         <div class="section">
@@ -706,41 +714,37 @@
                 skills.push(cb.value);
             });
 
-            // デフォルト有給日数を取得
-            let vacationDays = parseInt(document.getElementById('empVacationDays').value);
-            if (isNaN(vacationDays)) {
-                try {
-                    const defaultResponse = await fetch(`${API_BASE}/settings/vacation-default`);
-                    if (defaultResponse.ok) {
-                        const defaultSettings = await defaultResponse.json();
-                        vacationDays = defaultSettings.default_vacation_days || 20;
-                    } else {
-                        vacationDays = 20;
-                    }
-                } catch (error) {
-                    vacationDays = 20;
+            // デフォルト有給日数を取得（従業員に個別の有給日数は設定しないため、デフォルト値を使用）
+            let vacationDays = 20;
+            try {
+                const defaultResponse = await fetch(`${API_BASE}/settings/vacation-default`);
+                if (defaultResponse.ok) {
+                    const defaultSettings = await defaultResponse.json();
+                    vacationDays = defaultSettings.default_vacation_days || 20;
                 }
+            } catch (error) {
+                vacationDays = 20;
             }
 
             const employeeId = document.getElementById('empId').value;
             
             // 個別休暇設定を取得
             const vacationSettings = {};
-            const normalAnnual = document.getElementById('empNormalAnnual').value;
-            const normalMonthly = document.getElementById('empNormalMonthly').value;
-            const paidAnnual = document.getElementById('empPaidAnnual').value;
-            const paidMonthly = document.getElementById('empPaidMonthly').value;
+            const normalAnnualEl = document.getElementById('empNormalAnnual');
+            const normalMonthlyEl = document.getElementById('empNormalMonthly');
+            const paidAnnualEl = document.getElementById('empPaidAnnual');
+            const paidMonthlyEl = document.getElementById('empPaidMonthly');
             
-            if (normalAnnual) vacationSettings.normal_annual = parseInt(normalAnnual);
-            if (normalMonthly) vacationSettings.normal_monthly = parseInt(normalMonthly);
-            if (paidAnnual) vacationSettings.paid_annual = parseInt(paidAnnual);
-            if (paidMonthly) vacationSettings.paid_monthly = parseInt(paidMonthly);
+            if (normalAnnualEl && normalAnnualEl.value) vacationSettings.normal_annual = parseInt(normalAnnualEl.value);
+            if (normalMonthlyEl && normalMonthlyEl.value) vacationSettings.normal_monthly = parseInt(normalMonthlyEl.value);
+            if (paidAnnualEl && paidAnnualEl.value) vacationSettings.paid_annual = parseInt(paidAnnualEl.value);
+            if (paidMonthlyEl && paidMonthlyEl.value) vacationSettings.paid_monthly = parseInt(paidMonthlyEl.value);
             
             const data = {
                 name: document.getElementById('empName').value,
-                kana_name: document.getElementById('empKanaName').value,
-                phone: document.getElementById('empPhone').value,
-                email: document.getElementById('empEmail').value,
+                kana_name: document.getElementById('empKanaName').value || '',
+                phone: document.getElementById('empPhone').value || '',
+                email: document.getElementById('empEmail').value || '',
                 skills: skills,
                 vacation_days: vacationDays
             };
@@ -827,7 +831,7 @@
                                 ).join('') : ''}
                             </div>
                             <button onclick="editEmployee('${escapedId}')">編集</button>
-                            <button class="btn-danger" onclick="deleteEmployee(event, '${escapedId}')">削除</button>
+                            <button class="btn-danger" onclick="deleteEmployee('${escapedId}')">削除</button>
                         </div>
                         `;
                     }).join('');
@@ -853,7 +857,7 @@
                                     `<span class="skill-tag" style="background: #ddd; color: #666;">${getTaskName(skill)}</span>`
                                 ).join('') : ''}
                             </div>
-                            <button onclick="restoreEmployee(event, '${escapedId}')" style="background: #28a745; color: white;">復活</button>
+                            <button onclick="restoreEmployee('${escapedId}')" style="background: #28a745; color: white;">復活</button>
                         </div>
                         `;
                     }).join('');
@@ -923,7 +927,7 @@
         }
 
         // 従業員削除
-        async function deleteEmployee(event, employeeId) {
+        async function deleteEmployee(employeeId) {
             if (!confirm('この従業員を削除しますか？')) return;
 
             const button = event.target;
@@ -1001,7 +1005,7 @@
         }
 
         // 従業員を復活
-        async function restoreEmployee(event, employeeId) {
+        async function restoreEmployee(employeeId) {
             if (!confirm(`${employeeId}を復活しますか？`)) return;
 
             const button = event.target;
@@ -1835,7 +1839,91 @@
             loadEmployees();
             loadDefaultVacation();
             loadAllVacationRequests();
+            loadDeletedEmployees();
         });
+
+        // 削除した従業員を管理する配列
+        let deletedEmployees = [];
+        
+        // 従業員削除（修正版）
+        async function deleteEmployee(employeeId) {
+            if (!confirm('この従業員を削除しますか？')) return;
+
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '🔄 削除中...';
+            setButtonLoading(button, true);
+
+            try {
+                // 削除前に従業員データを保存
+                const empResponse = await fetch(`${API_BASE}/employees/${employeeId}`);
+                if (empResponse.ok) {
+                    const empData = await empResponse.json();
+                    deletedEmployees.push(empData);
+                }
+                
+                const response = await fetch(`${API_BASE}/employees/${employeeId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showMessage('employeeListMessage', 'success', '✓ 従業員を削除しました。');
+                    await loadEmployees();
+                    await loadDeletedEmployees();
+                } else {
+                    throw new Error('削除に失敗しました');
+                }
+            } catch (error) {
+                showMessage('employeeListMessage', 'error', `エラー: ${error.message}`);
+            } finally {
+                button.textContent = originalText;
+                setButtonLoading(button, false);
+            }
+        }
+
+        // 削除した従業員の折りたたみ表示切り替え
+        function toggleDeletedEmployees() {
+            const list = document.getElementById('deletedEmployeeList');
+            const icon = document.getElementById('deletedToggleIcon');
+            
+            if (list.style.display === 'none') {
+                list.style.display = 'block';
+                icon.textContent = '▲';
+            } else {
+                list.style.display = 'none';
+                icon.textContent = '▼';
+            }
+        }
+
+        // 削除した従業員リストを読み込み
+        async function loadDeletedEmployees() {
+            const listDiv = document.getElementById('deletedEmployeeList');
+            const countSpan = document.getElementById('deletedEmployeeCount');
+            
+            if (deletedEmployees.length === 0) {
+                listDiv.innerHTML = '<p style="color: #999; padding: 10px;">削除された従業員はありません</p>';
+                countSpan.textContent = '(0人)';
+                return;
+            }
+            
+            countSpan.textContent = `(${deletedEmployees.length}人)`;
+            
+            listDiv.innerHTML = `<div class="employee-list">${deletedEmployees.map(emp => {
+                const kanaDisplay = emp.kana_name ? ` (${emp.kana_name})` : '';
+                return `
+                <div class="employee-card" style="opacity: 0.7; border-left-color: #dc3545;">
+                    <h4>${emp.name}${kanaDisplay} (ID: ${emp.employee_id}) <span style="color: #dc3545; font-size: 0.8em;">[削除済み]</span></h4>
+                    <p><strong>電話:</strong> ${emp.phone || '未設定'}</p>
+                    <p><strong>メール:</strong> ${emp.email || '未設定'}</p>
+                    <div class="skills">
+                        ${emp.skills ? emp.skills.map(skill => 
+                            `<span class="skill-tag">${getTaskName(skill)}</span>`
+                        ).join('') : ''}
+                    </div>
+                </div>
+                `;
+            }).join('')}</div>`;
+        }
     </script>
 </body>
 </html>

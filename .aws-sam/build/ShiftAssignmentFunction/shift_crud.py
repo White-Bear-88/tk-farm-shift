@@ -13,10 +13,24 @@ else:
 
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
+def get_cors_headers():
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+    }
+
 def lambda_handler(event, context):
     try:
         method = event['httpMethod']
         path = event['path']
+        
+        if method == 'OPTIONS':
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': ''
+            }
         
         if method == 'GET' and '/shifts/' in path:
             return get_shifts_by_date(event)
@@ -31,13 +45,13 @@ def lambda_handler(event, context):
         
         return {
             'statusCode': 404,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': 'Not found'})
         }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -64,7 +78,7 @@ def get_shifts_by_date(event):
     
     return {
         'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
+        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
         'body': json.dumps(shifts, default=str)
     }
 
@@ -119,7 +133,7 @@ def get_shifts_for_employee(event):
 
     return {
         'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
+        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
         'body': json.dumps(shifts, default=str)
     }
 
@@ -138,7 +152,7 @@ def create_shift(event):
         if item['SK'].startswith(f'EMP#{employee_id}#'):
             return {
                 'statusCode': 400,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': 'Employee already has a shift on this date'})
             }
 
@@ -159,7 +173,7 @@ def create_shift(event):
     
     return {
         'statusCode': 201,
-        'headers': {'Content-Type': 'application/json'},
+        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
         'body': json.dumps({'message': 'Shift created successfully'})
     }
 
@@ -182,7 +196,7 @@ def update_shift(event):
         if 'Item' not in resp:
             return {
                 'statusCode': 404,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': 'Shift not found'})
             }
         # Prevent reassign if target employee already has a shift that day
@@ -195,7 +209,7 @@ def update_shift(event):
             if it['SK'].startswith(f'EMP#{new_employee}#'):
                 return {
                     'statusCode': 400,
-                    'headers': {'Content-Type': 'application/json'},
+                    'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                     'body': json.dumps({'error': 'Target employee already has a shift on this date'})
                 }
 
@@ -215,7 +229,7 @@ def update_shift(event):
         table.delete_item(Key={'PK': pk, 'SK': sk})
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'message': 'Shift reassigned successfully'})
         }
     
@@ -230,7 +244,7 @@ def update_shift(event):
     if not expression_values:
         return {
             'statusCode': 400,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': 'No updates provided'})
         }
     
@@ -242,7 +256,7 @@ def update_shift(event):
     
     return {
         'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
+        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
         'body': json.dumps({'message': 'Shift updated successfully'})
     }
 
@@ -258,6 +272,6 @@ def delete_shift(event):
     
     return {
         'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
+        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
         'body': json.dumps({'message': 'Shift deleted successfully'})
     }

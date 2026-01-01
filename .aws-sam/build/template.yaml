@@ -238,7 +238,7 @@ Resources:
       FunctionName:
         Fn::Sub: dairy-task-management-${Environment}
       CodeUri: TaskManagementFunction
-      Handler: task_management_crud.lambda_handler
+      Handler: task_management.lambda_handler
       Policies:
       - DynamoDBCrudPolicy:
           TableName:
@@ -407,6 +407,83 @@ Resources:
             Method: DELETE
     Metadata:
       SamResourceId: VacationManagementFunction
+  CogniteUserManagementFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: dairy-cognite-user-management-${Environment}
+      CodeUri: CogniteUserManagementFunction
+      Handler: cognite_user_management.lambda_handler
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ShiftManagementTable
+      Events:
+        GetCogniteUsers:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /cognite-users
+            Method: GET
+        CreateCogniteUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /cognite-users
+            Method: POST
+        GetCogniteUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /cognite-users/{id}
+            Method: GET
+        UpdateCogniteUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /cognite-users/{id}
+            Method: PUT
+        DeleteCogniteUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /cognite-users/{id}
+            Method: DELETE
+    Metadata:
+      SamResourceId: CogniteUserManagementFunction
+  AuthServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: dairy-auth-service-${Environment}
+      CodeUri: AuthServiceFunction
+      Handler: auth_service.lambda_handler
+      Policies:
+      - DynamoDBReadPolicy:
+          TableName:
+            Ref: ShiftManagementTable
+      Events:
+        VerifyToken:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /auth/verify
+            Method: POST
+        GetProfile:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /auth/profile
+            Method: GET
+    Metadata:
+      SamResourceId: AuthServiceFunction
 Outputs:
   WebAppUrl:
     Description: Web Application URL

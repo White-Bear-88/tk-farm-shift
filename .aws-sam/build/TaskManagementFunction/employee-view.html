@@ -277,12 +277,20 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>👤 従業員画面</h1>
-            <div>
-                <select id="employeeSelect" onchange="switchEmployee()">
-                    <option value="">従業員を選択</option>
-                </select>
-                <a href="menu.html" style="margin-left: 15px; text-decoration: none; color: white; background: #007bff; padding: 10px 20px; border-radius: 5px; display: inline-block;">← メニューに戻る</a>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <h1 style="margin: 0;">👤 従業員画面</h1>
+                    <div id="employeeSelectContainer">
+                        <select id="employeeSelect" onchange="switchEmployee()">
+                            <option value="">従業員を選択</option>
+                        </select>
+                    </div>
+                    <span id="employeeDisplay" style="font-weight: bold; color: #333; display: none;"></span>
+                </div>
+                <div style="display: flex; gap: 10px; margin-left: auto;">
+                    <button id="viewOtherShiftsBtn" onclick="navigateToShiftCalendar()" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; display: none;">他の従業員のシフトを確認</button>
+                    <a href="menu.html" style="text-decoration: none; color: white; background: #007bff; padding: 10px 20px; border-radius: 5px; display: inline-block;">← メニューに戻る</a>
+                </div>
             </div>
         </div>
 
@@ -549,12 +557,49 @@
             }
         }
 
+        // ユーザー情報とロールを取得
+        function getUserInfo() {
+            const userInfoStr = localStorage.getItem('current_user');
+            if (userInfoStr) {
+                return JSON.parse(userInfoStr);
+            }
+            return null;
+        }
+
+        // ロールチェック関数
+        function hasRole(roles, targetRole) {
+            return roles && roles.includes(targetRole);
+        }
+
+        // 他の従業員のシフトカレンダーへ遷移
+        function navigateToShiftCalendar() {
+            window.location.href = 'shift-calendar-view.html';
+        }
+
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', () => {
+            const userInfo = getUserInfo();
+            
+            // employeeロールのみの場合の処理
+            if (userInfo && hasRole(userInfo.groups, 'employee') && !hasRole(userInfo.groups, 'admin')) {
+                // 従業員選択を非表示にし、固定表示に変更
+                document.getElementById('employeeSelectContainer').style.display = 'none';
+                document.getElementById('employeeDisplay').style.display = 'inline';
+                document.getElementById('employeeDisplay').textContent = `${userInfo.username} さん`;
+                document.getElementById('viewOtherShiftsBtn').style.display = 'inline-block';
+                
+                // 自分の従業員IDを設定（usernameを使用）
+                selectedEmployeeId = userInfo.username;
+                loadEmployeeInfo();
+                updateCalendar();
+            }
+            
             initYearFilter();
             loadEmployees();
             loadVacationTypes();
-            updateCalendar();
+            if (!selectedEmployeeId) {
+                updateCalendar();
+            }
         });
 
         // 従業員一覧読み込み

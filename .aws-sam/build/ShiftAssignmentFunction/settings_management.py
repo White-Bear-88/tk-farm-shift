@@ -11,10 +11,24 @@ else:
 
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
+def get_cors_headers():
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+    }
+
 def lambda_handler(event, context):
     try:
         http_method = event['httpMethod']
         path = event['path']
+        
+        if http_method == 'OPTIONS':
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': ''
+            }
         
         # Requirements API
         if '/requirements/' in path:
@@ -27,13 +41,13 @@ def lambda_handler(event, context):
         else:
             return {
                 'statusCode': 404,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': 'Not found'})
             }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -94,19 +108,19 @@ def get_global_default_requirements():
         if 'Item' in response:
             return {
                 'statusCode': 200,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps(response['Item']['requirements'])
             }
         else:
             return {
                 'statusCode': 200,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({})
             }
     except Exception as e:
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({})
         }
 
@@ -225,7 +239,7 @@ def get_confirmation_settings():
         if 'Item' in response:
             return {
                 'statusCode': 200,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({
                     'confirmation_day': response['Item'].get('confirmation_day', 25)
                 })
@@ -233,13 +247,13 @@ def get_confirmation_settings():
         else:
             return {
                 'statusCode': 200,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'confirmation_day': 25})
             }
     except Exception as e:
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'confirmation_day': 25})
         }
 
@@ -276,7 +290,7 @@ def get_vacation_default():
         if 'Item' in response:
             return {
                 'statusCode': 200,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({
                     'default_vacation_days': int(response['Item'].get('default_vacation_days', 20)),
                     'annual_vacation_days': int(response['Item'].get('annual_vacation_days', 0)),
@@ -289,7 +303,7 @@ def get_vacation_default():
             # デフォルト値を返す
             return {
                 'statusCode': 200,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({
                     'default_vacation_days': 20,
                     'annual_vacation_days': 0,
@@ -303,7 +317,7 @@ def get_vacation_default():
         # エラーが発生してもデフォルト値を返す（500エラーを避ける）
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({
                 'default_vacation_days': 20,
                 'annual_vacation_days': 0,

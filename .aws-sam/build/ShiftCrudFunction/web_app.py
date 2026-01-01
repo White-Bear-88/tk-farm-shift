@@ -2,7 +2,22 @@ import json
 import os
 import base64
 
+def get_cors_headers():
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+    }
+
 def lambda_handler(event, context):
+    # OPTIONSリクエストのCORS対応
+    if event.get('httpMethod') == 'OPTIONS':
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': ''
+        }
+    
     # リクエストパスを取得
     path = event.get('path', '/')
     
@@ -20,8 +35,8 @@ def lambda_handler(event, context):
             return {
                 'statusCode': 200,
                 'headers': {
-                    'Content-Type': 'image/x-icon',
-                    'Cache-Control': 'public, max-age=86400'
+                    **{'Content-Type': 'image/x-icon', 'Cache-Control': 'public, max-age=86400'},
+                    **get_cors_headers()
                 },
                 'body': base64.b64encode(favicon_data).decode('utf-8'),
                 'isBase64Encoded': True
@@ -29,7 +44,7 @@ def lambda_handler(event, context):
         except FileNotFoundError:
             return {
                 'statusCode': 204,
-                'headers': {'Content-Type': 'image/x-icon'},
+                'headers': {**{'Content-Type': 'image/x-icon'}, **get_cors_headers()},
                 'body': ''
             }
     
@@ -51,20 +66,20 @@ def lambda_handler(event, context):
         return {
             'statusCode': 200,
             'headers': {
-                'Content-Type': 'text/html; charset=utf-8',
-                'Cache-Control': 'no-cache'
+                **{'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache'},
+                **get_cors_headers()
             },
             'body': html_content
         }
     except FileNotFoundError:
         return {
             'statusCode': 404,
-            'headers': {'Content-Type': 'text/html; charset=utf-8'},
+            'headers': {**{'Content-Type': 'text/html; charset=utf-8'}, **get_cors_headers()},
             'body': '<h1>404 Not Found</h1><p>ファイルが見つかりません</p>'
         }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': f'Failed to load HTML: {str(e)}'})
         }

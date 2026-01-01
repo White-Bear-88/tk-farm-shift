@@ -13,8 +13,23 @@ else:
 
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
+def get_cors_headers():
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+    }
+
 def lambda_handler(event, context):
     try:
+        # OPTIONSリクエストのCORS対応
+        if event['httpMethod'] == 'OPTIONS':
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': ''
+            }
+            
         employee_id = event['pathParameters']['id']
         query_params = event.get('queryStringParameters', {}) or {}
         
@@ -58,14 +73,14 @@ def lambda_handler(event, context):
         # フロントエンド互換性のため、シンプルにシフトの配列を返す
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps(shifts, default=str)
         }
         
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 

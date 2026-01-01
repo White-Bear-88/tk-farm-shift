@@ -14,10 +14,24 @@ else:
 
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
+def get_cors_headers():
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+    }
+
 def lambda_handler(event, context):
     try:
         http_method = event['httpMethod']
         path = event['path']
+        
+        if http_method == 'OPTIONS':
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': ''
+            }
         
         if http_method == 'POST' and path == '/shifts/generate-monthly':
             return generate_monthly_shifts(event)
@@ -29,13 +43,13 @@ def lambda_handler(event, context):
         else:
             return {
                 'statusCode': 404,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': 'Not found'})
             }
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': str(e)})
         }
 
@@ -50,7 +64,7 @@ def generate_monthly_shifts(event):
         if not month:
             return {
                 'statusCode': 400,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': '月が指定されていません'})
             }
             
@@ -63,7 +77,7 @@ def generate_monthly_shifts(event):
         except (ValueError, AttributeError) as e:
             return {
                 'statusCode': 400,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': f'不正な月フォーマット: {month}'})
             }
             
@@ -72,7 +86,7 @@ def generate_monthly_shifts(event):
         if (year, month_num) < (now.year, now.month):
             return {
                 'statusCode': 400,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': '過去の月の生成はできません'})
             }
 
@@ -93,7 +107,7 @@ def generate_monthly_shifts(event):
         if not employees:
             return {
                 'statusCode': 400,
-                'headers': {'Content-Type': 'application/json'},
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': '従業員が登録されていません'})
             }
         
@@ -118,7 +132,7 @@ def generate_monthly_shifts(event):
         
         return {
             'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({
                 'message': f'Generated {len(generated_shifts)} shifts for {month}',
                 'shifts': generated_shifts,
@@ -128,7 +142,7 @@ def generate_monthly_shifts(event):
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({'error': f'シフト生成エラー: {str(e)}'})
         }
 
@@ -194,7 +208,7 @@ def get_shifts_by_month(month):
     
     return {
         'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
+        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
         'body': json.dumps(all_shifts)
     }
 
@@ -360,7 +374,7 @@ def assign_shifts(event):
     
     return {
         'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
+        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
         'body': json.dumps({
             'message': f'Successfully assigned {len(assignments)} shifts',
             'assignments': assignments

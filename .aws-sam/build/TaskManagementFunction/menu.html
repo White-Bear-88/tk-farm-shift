@@ -143,21 +143,91 @@
     </div>
 
     <script>
+        // JWTデコード関数
+        function parseJWT(token) {
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            } catch (error) {
+                console.error('JWTパースエラー:', error);
+                return null;
+            }
+        }
+
+        // ロールチェック関数
+        function hasRole(roles, targetRole) {
+            return roles && roles.includes(targetRole);
+        }
+
+        // ユーザー情報とロールを取得
+        function getUserInfo() {
+            const token = localStorage.getItem('cognito_token') || sessionStorage.getItem('cognito_token');
+            if (!token) {
+                // トークンがない場合はログインページにリダイレクト
+                window.location.href = 'login.html';
+                return null;
+            }
+
+            const payload = parseJWT(token);
+            if (!payload) {
+                window.location.href = 'login.html';
+                return null;
+            }
+
+            return {
+                username: payload.username || payload.sub,
+                groups: payload['cognito:groups'] || [],
+                email: payload.email
+            };
+        }
+
+        // メニュー表示をロールに応じて制御
+        function setupMenu() {
+            const userInfo = getUserInfo();
+            if (!userInfo) return;
+
+            const isAdmin = hasRole(userInfo.groups, 'admin');
+            const isEmployee = hasRole(userInfo.groups, 'employee');
+
+            // メニューカードを取得
+            const employeeCard = document.querySelector('.menu-card[onclick*="employee-view.html"]');
+            const adminCard = document.querySelector('.menu-card[onclick*="admin-menu.html"]');
+
+            // employeeロールのみの場合は管理者メニューを非表示
+            if (isEmployee && !isAdmin) {
+                if (adminCard) {
+                    adminCard.style.display = 'none';
+                }
+            }
+
+            // ユーザー情報をローカルストレージに保存（他のページで使用）
+            localStorage.setItem('current_user', JSON.stringify(userInfo));
+        }
+
         function navigateTo(page) {
             window.location.href = page;
         }
 
-        // ページ読み込み時のアニメーション
+        // ページ読み込み時のアニメーションとメニュー設定
         document.addEventListener('DOMContentLoaded', function() {
+            // メニュー設定を先に実行
+            setupMenu();
+
             const cards = document.querySelectorAll('.menu-card');
             cards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(30px)';
-                setTimeout(() => {
-                    card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 200);
+                if (card.style.display !== 'none') {
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateY(30px)';
+                    setTimeout(() => {
+                        card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                        card.style.opacity = '1';
+                        card.style.transform = 'translateY(0)';
+                    }, index * 200);
+                }
             });
         });
     </script>
