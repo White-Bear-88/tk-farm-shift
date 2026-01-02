@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CogniteIDユーザー管理</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .actions {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.8;
+        }
+        .back-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .back-btn:hover {
+            background: #0056b3;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .role-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .role-admin {
+            background-color: #dc3545;
+            color: white;
+        }
+        .role-employee {
+            background-color: #28a745;
+            color: white;
+        }
+        .status-active {
+            color: #28a745;
+        }
+        .status-inactive {
+            color: #dc3545;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        .status-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CogniteIDユーザー管理</h1>
+        
+        <div class="actions">
+            <button onclick="showCreateModal()">新規ユーザー作成</button>
+            <a href="menu.html" class="back-btn">← メニューに戻る</a>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <table id="usersTable">
+            <thead>
+                <tr>
+                    <th>CogniteID</th>
+                    <th>名前</th>
+                    <th>メール</th>
+                    <th>ロール</th>
+                    <th>紐づけ従業員</th>
+                    <th>ステータス</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="usersTableBody">
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ユーザー作成/編集モーダル -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <h3 id="modalTitle">新規ユーザー作成</h3>
+            <form id="userForm">
+                <div class="form-group">
+                    <label for="cogniteUserId">CogniteID（自動生成）</label>
+                    <input type="text" id="cogniteUserId" readonly style="background-color: #f8f9fa; color: #6c757d;" placeholder="保存時に自動生成されます">
+                </div>
+                <div class="form-group">
+                    <label for="linkedEmployee">紐づけ従業員 *</label>
+                    <select id="linkedEmployee" required>
+                        <option value="">選択してください</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="userEmail">メールアドレス *</label>
+                    <input type="email" id="userEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="userRole">ロール *</label>
+                    <select id="userRole" required>
+                        <option value="employee">従業員</option>
+                        <option value="admin">管理者</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="isActive">ステータス</label>
+                    <select id="isActive">
+                        <option value="true">有効</option>
+                        <option value="false">無効</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit">更新</button>
+                    <button type="button" onclick="closeModal()">戻る</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev';
+        let currentEditingUserId = null;
+        let employees = [];
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadEmployees();
+            loadUsers();
+        });
+
+        // 定期的に従業員情報を同期（30秒ごと）
+        setInterval(async function() {
+            await loadEmployees();
+            await loadUsers();
+        }, 30000);
+
+        // 従業員一覧を読み込み
+        async function loadEmployees() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/employees`);
+                if (!response.ok) throw new Error('従業員データの取得に失敗しました');
+                
+                employees = await response.json();
+                updateEmployeeSelect();
+            } catch (error) {
+                console.error('従業員読み込みエラー:', error);
+            }
+        }
+
+        // 従業員選択肢を更新
+        function updateEmployeeSelect() {
+            const select = document.getElementById('linkedEmployee');
+            select.innerHTML = '<option value="">選択してください</option>';
+            
+            employees.forEach(emp => {
+                if (!emp.deleted) {
+                    const option = document.createElement('option');
+                    option.value = emp.employee_id;
+                    option.textContent = `${emp.employee_id} - ${emp.name}`;
+                    select.appendChild(option);
+                }
+            });
+        }
+
+        // ユーザー一覧を読み込み
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/cognite-users`);
+                if (!response.ok) throw new Error('ユーザーデータの取得に失敗しました');
+                
+                const users = await response.json();
+                displayUsers(users);
+            } catch (error) {
+                console.error('ユーザー読み込みエラー:', error);
+                showMessage('ユーザーデータの読み込みに失敗しました', 'error');
+            }
+        }
+
+        // ユーザー一覧を表示
+        function displayUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+
+            users.forEach(user => {
+                const row = document.createElement('tr');
+                
+                // 紐づけ従業員名を取得（最新の従業員情報から）
+                const linkedEmployee = employees.find(emp => emp.employee_id === user.employee_id);
+                const employeeName = linkedEmployee ? `${linkedEmployee.employee_id} - ${linkedEmployee.name}` : '';
+                
+                // 従業員名が変更されている場合は、表示する名前を更新
+                const displayName = linkedEmployee ? linkedEmployee.name : user.name;
+
+                row.innerHTML = `
+                    <td>${user.cognite_user_id}</td>
+                    <td>${displayName}</td>
+                    <td>${user.email}</td>
+                    <td><span class="role-badge role-${user.role}">${user.role === 'admin' ? '管理者' : '従業員'}</span></td>
+                    <td>${employeeName}</td>
+                    <td class="${user.is_active ? 'status-active' : 'status-inactive'}">
+                        ${user.is_active ? '有効' : '無効'}
+                    </td>
+                    <td>
+                        <button onclick="editUser('${user.cognite_user_id}')">編集</button>
+                        <button class="btn-danger" onclick="deleteUser('${user.cognite_user_id}')">削除</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 新規作成モーダルを表示
+        function showCreateModal() {
+            currentEditingUserId = null;
+            document.getElementById('modalTitle').textContent = '新規ユーザー作成';
+            document.getElementById('userForm').reset();
+            document.getElementById('cogniteUserId').value = '';
+            document.getElementById('cogniteUserId').placeholder = '保存時に自動生成されます';
+            document.getElementById('userModal').style.display = 'block';
+        }
+
+        // 編集モーダルを表示
+        async function editUser(userId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/cognite-users/${userId}`);
+                if (!response.ok) throw new Error('ユーザーデータの取得に失敗しました');
+                
+                const user = await response.json();
+                
+                currentEditingUserId = userId;
+                document.getElementById('modalTitle').textContent = 'ユーザー編集';
+                document.getElementById('cogniteUserId').value = user.cognite_user_id;
+                document.getElementById('cogniteUserId').placeholder = '';
+                document.getElementById('userEmail').value = user.email;
+                document.getElementById('userRole').value = user.role;
+                document.getElementById('linkedEmployee').value = user.employee_id;
+                document.getElementById('isActive').value = user.is_active.toString();
+                
+                document.getElementById('userModal').style.display = 'block';
+            } catch (error) {
+                console.error('ユーザー取得エラー:', error);
+                showMessage('ユーザーデータの取得に失敗しました', 'error');
+            }
+        }
+
+        // モーダルを閉じる
+        function closeModal() {
+            document.getElementById('userModal').style.display = 'none';
+        }
+
+        // フォーム送信
+        document.getElementById('userForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                email: document.getElementById('userEmail').value,
+                role: document.getElementById('userRole').value,
+                employee_id: document.getElementById('linkedEmployee').value,
+                is_active: document.getElementById('isActive').value === 'true',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
+            // 編集時のみcognite_user_idを追加
+            if (currentEditingUserId) {
+                formData.cognite_user_id = document.getElementById('cogniteUserId').value;
+            }
+            
+            // 紐づけ従業員から最新の名前を取得（従業員管理画面での変更を反映）
+            const selectedEmployee = employees.find(emp => emp.employee_id === formData.employee_id);
+            if (selectedEmployee) {
+                formData.name = selectedEmployee.name;
+            } else {
+                // 従業員が見つからない場合は、最新の従業員情報を再取得
+                await loadEmployees();
+                const updatedEmployee = employees.find(emp => emp.employee_id === formData.employee_id);
+                if (updatedEmployee) {
+                    formData.name = updatedEmployee.name;
+                }
+            }
+
+            try {
+                let response;
+                if (currentEditingUserId) {
+                    // 更新
+                    response = await fetch(`${API_BASE_URL}/cognite-users/${currentEditingUserId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+                } else {
+                    // 新規作成
+                    response = await fetch(`${API_BASE_URL}/cognite-users`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+                }
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || '保存に失敗しました');
+                }
+
+                showMessage(currentEditingUserId ? 'ユーザーを更新しました' : 'ユーザーを作成しました', 'success');
+                closeModal();
+                loadUsers();
+            } catch (error) {
+                console.error('保存エラー:', error);
+                showMessage(error.message, 'error');
+            }
+        });
+
+        // ユーザー削除
+        async function deleteUser(userId) {
+            if (!confirm('このユーザーを削除しますか？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/cognite-users/${userId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('削除に失敗しました');
+
+                showMessage('ユーザーを削除しました', 'success');
+                loadUsers();
+            } catch (error) {
+                console.error('削除エラー:', error);
+                showMessage('削除に失敗しました', 'error');
+            }
+        }
+
+        // メッセージ表示
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('statusMessage');
+            messageDiv.textContent = message;
+            messageDiv.className = `status-message status-${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // モーダル外クリックで閉じる
+        window.onclick = function(event) {
+            const modal = document.getElementById('userModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>

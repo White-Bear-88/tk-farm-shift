@@ -393,7 +393,7 @@
                         <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
                         <span>確定中…</span>
                     </span>
-                    <button id="confirmShiftBtn" style="display: none; margin-left: 10px;" onclick="confirmGeneratedShifts()">確定</button>
+                    <button id="confirmShiftBtn" style="margin-left: 10px;" onclick="confirmGeneratedShifts()" disabled>確定</button>
                 </div>
             </div>
             <div style="margin-top: 10px;">
@@ -536,6 +536,8 @@
         // プレビュー用の月とシフト配列（確定までDBに書き込まない）
         let previewMonth = null;
         let previewShifts = [];
+        // シフト編集ダイアログの初期値を保存（未保存変更の検出用）
+        let initialDialogValues = null;
 
         // ボタンの処理中状態を管理
         function setButtonLoading(button, loading) {
@@ -1074,7 +1076,7 @@
                 let shifts = [];
                 
                 // プレビューシフトがあればプレビューのみ表示、なければサーバーデータを表示
-                if (window.previewShifts && window.previewShifts.length > 0) {
+                if (window.previewShifts && window.previewShifts.length > 0 && window.previewMonth === monthValue) {
                     // プレビューシフトのみを表示（_previewフラグを立てる）
                     shifts = window.previewShifts.map(s => ({...s, _preview: true}));
                 } else {
@@ -1109,7 +1111,7 @@
                             }
                             
                             const empName = employeesMap[s.employee_id] || s.employee_id;
-                            const previewLabel = s._preview ? ' (確定前)' : '';
+                            const previewLabel = s._preview ? '（仮）' : '';
                             return `<div class="shift-assignment${conflictClass}${previewClass}${shiftTypeClass}">${getTaskName(s.task_type)} — ${empName}${previewLabel}</div>`;
                         }).join('');
                         dayDiv.innerHTML += shiftsHtml;
@@ -1167,12 +1169,98 @@
 
         // シフトモーダルを閉じる
         function closeShiftModal() {
+            // 未保存の変更があるかチェック
+            if (hasUnsavedChanges()) {
+                if (!confirm('変更ボタンを押さないと変更は反映されません。閉じてよろしいですか？')) {
+                    return;
+                }
+            }
+            
             const modal = document.getElementById('shiftModal');
             modal.classList.remove('is-open');
             modal.style.display = 'none';
             clearFormFields();
             document.getElementById('dayShiftsList').innerHTML = '';
             document.getElementById('modalMessage').innerHTML = '';
+            initialDialogValues = null;
+        }
+
+        // 未保存の変更があるかチェック
+        function hasUnsavedChanges() {
+            if (!initialDialogValues) return false;
+            
+            // 各行の現在の値を取得
+            const rows = document.querySelectorAll('#dayShiftsList tbody tr');
+            if (rows.length === 0) return false;
+            
+            // 各行をチェック
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const rowId = row.dataset.rowId;
+                const initial = initialDialogValues[rowId];
+                if (!initial) continue;
+                
+                // 現在の値を取得
+                const currentEmployee = row.querySelector('.row-employee-select')?.value;
+                const currentTask = row.querySelector('.row-task-select')?.value;
+                const currentStartHour = row.querySelector('.row-start-hour')?.value;
+                const currentStartMinute = row.querySelector('.row-start-minute')?.value;
+                const currentEndHour = row.querySelector('.row-end-hour')?.value;
+                const currentEndMinute = row.querySelector('.row-end-minute')?.value;
+                
+                // 初期値と比較
+                if (currentEmployee !== initial.employee_id ||
+                    currentTask !== initial.task_type ||
+                    currentStartHour !== initial.startHour ||
+                    currentStartMinute !== initial.startMinute ||
+                    currentEndHour !== initial.endHour ||
+                    currentEndMinute !== initial.endMinute) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        // 初期値を保存
+        function saveInitialDialogValues() {
+            initialDialogValues = {};
+            const rows = document.querySelectorAll('#dayShiftsList tbody tr');
+            rows.forEach(row => {
+                const rowId = row.dataset.rowId;
+                const employeeSelect = row.querySelector('.row-employee-select');
+                const taskSelect = row.querySelector('.row-task-select');
+                const startHour = row.querySelector('.row-start-hour');
+                const startMinute = row.querySelector('.row-start-minute');
+                const endHour = row.querySelector('.row-end-hour');
+                const endMinute = row.querySelector('.row-end-minute');
+                
+                if (rowId) {
+                    initialDialogValues[rowId] = {
+                        employee_id: employeeSelect?.value || '',
+                        task_type: taskSelect?.value || '',
+                        startHour: startHour?.value || '',
+                        startMinute: startMinute?.value || '',
+                        endHour: endHour?.value || '',
+                        endMinute: endMinute?.value || ''
+                    };
+                }
+            });
+        }
+
+        // 変更ボタンの有効/無効を更新
+        function updateUpdateButtonState() {
+            const updateBtn = document.getElementById('updateBtn');
+            if (!updateBtn) return;
+            
+            // 変更があれば有効化、なければ無効化
+            if (hasUnsavedChanges()) {
+                updateBtn.disabled = false;
+                updateBtn.style.opacity = '1';
+            } else {
+                updateBtn.disabled = true;
+                updateBtn.style.opacity = '0.6';
+            }
         }
 
         // 月が過去かどうか判定
@@ -1333,15 +1421,15 @@
                         existingShifts: existingShifts
                     };
                     
-                    // 確定ボタンを表示
+                    // 確定ボタンを有効化
                     if (confirmBtn) {
-                        confirmBtn.style.display = 'inline-block';
+                        confirmBtn.disabled = false;
                     }
                     
                     // カレンダーにプレビュー表示（確定前）
                     displayGeneratedShiftsPreview(monthValue, shifts);
                     
-                    showMessage('generateMessage', 'success', 'シフトを生成しました。確定ボタンを押してください。');
+                    showMessage('generateMessage', 'success', 'シフト（仮）を生成しました。確定ボタンを押すと本登録されます。');
                 } else {
                     showMessage('generateMessage', 'error', 'シフトが生成されませんでした。従業員データや人数設定を確認してください。');
                 }
@@ -1530,7 +1618,7 @@
             // スピナー表示
             const confirmBtn = document.getElementById('confirmShiftBtn');
             const spinner = document.getElementById('confirmShiftSpinner');
-            if (confirmBtn) confirmBtn.style.display = 'none';
+            if (confirmBtn) confirmBtn.disabled = true;
             if (spinner) spinner.style.display = 'inline';
             
             try {
@@ -1558,9 +1646,9 @@
                     }
                 }
                 
-                // 確定ボタンを非表示
+                // 確定ボタンを無効化
                 if (confirmBtn) {
-                    confirmBtn.style.display = 'none';
+                    confirmBtn.disabled = true;
                 }
                 
                 // データをリセット
@@ -1570,7 +1658,7 @@
                 // カレンダーを再読み込み
                 await updateShiftCalendar();
                 
-                showMessage('generateMessage', 'success', 'シフトを確定しました');
+                showMessage('generateMessage', 'success', 'シフト（仮）を本登録しました');
             } catch (error) {
                 console.error('シフト確定エラー:', error);
                 showMessage('generateMessage', 'error', `エラー: ${error.message}`);
@@ -2010,7 +2098,11 @@
                 let shifts = response.ok ? await response.json() : [];
                 // include preview shifts for this month
                 if (window.previewMonth && window.previewMonth === date.slice(0,7)) {
-                    const added = window.previewShifts.filter(s => s.date === date).map(s => ({...s, _preview: true}));
+                    const added = window.previewShifts.filter(s => s.date === date).map(s => {
+                        // プレビューシフトからshift_idを除外（まだDBに登録されていないため）
+                        const {shift_id, ...shiftWithoutId} = s;
+                        return {...shiftWithoutId, _preview: true};
+                    });
                     shifts = shifts.concat(added);
                 }
 
@@ -2103,7 +2195,7 @@
                                 const endParts = (s.end_time || '00:00').split(':');
                                 
                                 return `
-                                    <tr id="${rowId}" style="border-bottom:1px solid #eee;" data-shift-id="${s.shift_id||''}" data-shift-index="${originalIndex}" ${titleAttr}>
+                                    <tr id="${rowId}" style="border-bottom:1px solid #eee;" data-shift-id="${s.shift_id||''}" data-shift-index="${originalIndex}" data-row-id="${rowId}" ${titleAttr}>
                                         <td style="padding:8px; width:200px;">
                                             <select class="row-employee-select" style="text-align:left; width:100%;" onchange="onRowEmployeeChange(this, '${rowId}')">
                                                 ${employeesData.map(emp => `
@@ -2143,11 +2235,18 @@
                     </table>
                 `;
                 
-                // 各行のプルダウンを初期化
-                filteredShifts.forEach((s, index) => {
+                // 各行のプルダウンを初期化（すべて完了してから初期値を保存）
+                const initPromises = filteredShifts.map((s, index) => {
                     const originalIndex = allShifts.indexOf(s);
                     const rowId = s.shift_id ? `row_${s.shift_id}` : `row_preview_${originalIndex}`;
-                    initializeRowSelects(rowId, s);
+                    return initializeRowSelects(rowId, s);
+                });
+                
+                // すべての初期化が完了してから初期値を保存
+                Promise.all(initPromises).then(() => {
+                    saveInitialDialogValues();
+                    // 初期状態では変更ボタンを無効化
+                    updateUpdateButtonState();
                 });
             }
 
@@ -2213,6 +2312,15 @@
             
             // 従業員に基づいて作業種別を読み込み
             await loadTasksForRowEmployee(taskSelect, shiftData.employee_id, shiftData.task_type);
+            
+            // 変更検知イベントリスナーを追加
+            const employeeSelect = row.querySelector('.row-employee-select');
+            if (employeeSelect) employeeSelect.addEventListener('change', updateUpdateButtonState);
+            if (taskSelect) taskSelect.addEventListener('change', updateUpdateButtonState);
+            if (startHourSelect) startHourSelect.addEventListener('change', updateUpdateButtonState);
+            if (startMinuteSelect) startMinuteSelect.addEventListener('change', updateUpdateButtonState);
+            if (endHourSelect) endHourSelect.addEventListener('change', updateUpdateButtonState);
+            if (endMinuteSelect) endMinuteSelect.addEventListener('change', updateUpdateButtonState);
         }
         
         // 行の従業員選択時に対応可能な作業種別を読み込み
@@ -2223,6 +2331,9 @@
             
             const taskSelect = row.querySelector('.row-task-select');
             await loadTasksForRowEmployee(taskSelect, employeeId);
+            
+            // 変更ボタンの状態を更新
+            updateUpdateButtonState();
         }
         
         // 従業員が対応可能な作業種別をselectに読み込み

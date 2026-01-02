@@ -1,8 +1,12 @@
 version = 0.1
 
+[default.build.parameters]
+template_file = "dairy-shift-management.yaml"
+
 [default.deploy.parameters]
 stack_name = "dairy-shift-management-dev"
 resolve_s3 = true
+template_file = "dairy-shift-management.yaml"
 s3_prefix = "dairy-shift-management-dev"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"

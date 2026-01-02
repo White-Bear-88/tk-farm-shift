@@ -1,0 +1,36 @@
+name: Deploy Frontend to S3 and CloudFront
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**/*.html', 'src/**/*.js', 'src/**/*.css', 'src/**/*.ico']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ap-northeast-1
+    
+    - name: Copy files to frontend directory
+      run: |
+        mkdir -p frontend
+        cp src/*.html frontend/ 2>/dev/null || true
+        cp src/*.js frontend/ 2>/dev/null || true
+        cp src/*.css frontend/ 2>/dev/null || true
+        cp src/*.ico frontend/ 2>/dev/null || true
+    
+    - name: Sync files to S3
+      run: |
+        aws s3 sync frontend/ s3://${{ secrets.S3_BUCKET_NAME }} --delete
+    
+    - name: Invalidate CloudFront
+      run: |
+        aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"

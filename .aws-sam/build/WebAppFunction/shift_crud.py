@@ -3,6 +3,7 @@ import boto3
 import os
 from datetime import datetime
 from decimal import Decimal
+from urllib.parse import unquote
 
 # Support using a local DynamoDB endpoint during development
 _dynamodb_endpoint = os.environ.get('DYNAMODB_ENDPOINT')
@@ -178,7 +179,7 @@ def create_shift(event):
     }
 
 def update_shift(event):
-    shift_id = event['pathParameters']['id']
+    shift_id = unquote(event['pathParameters']['id'])
     data = json.loads(event['body'])
     
     try:
@@ -201,75 +202,75 @@ def update_shift(event):
         
         # If employee change requested, perform copy+delete to move the item
         if 'employee_id' in data and data['employee_id'] != current_employee:
-        new_employee = data['employee_id']
-        # Fetch existing item
-        resp = table.get_item(Key={'PK': pk, 'SK': sk})
-        if 'Item' not in resp:
-            return {
-                'statusCode': 404,
-                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({'error': 'Shift not found'})
-            }
-        # Prevent reassign if target employee already has a shift that day
-        # Query shifts for the date and check
-        check_resp = table.query(
-            KeyConditionExpression='PK = :pk',
-            ExpressionAttributeValues={':pk': pk}
-        )
-        for it in check_resp['Items']:
-            if it['SK'].startswith(f'EMP#{new_employee}#'):
+            new_employee = data['employee_id']
+            # Fetch existing item
+            resp = table.get_item(Key={'PK': pk, 'SK': sk})
+            if 'Item' not in resp:
                 return {
-                    'statusCode': 400,
+                    'statusCode': 404,
                     'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                    'body': json.dumps({'error': 'Target employee already has a shift on this date'})
+                    'body': json.dumps({'error': 'Shift not found'})
                 }
+            # Prevent reassign if target employee already has a shift that day
+            # Query shifts for the date and check
+            check_resp = table.query(
+                KeyConditionExpression='PK = :pk',
+                ExpressionAttributeValues={':pk': pk}
+            )
+            for it in check_resp['Items']:
+                if it['SK'].startswith(f'EMP#{new_employee}#'):
+                    return {
+                        'statusCode': 400,
+                        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                        'body': json.dumps({'error': 'Target employee already has a shift on this date'})
+                    }
 
-        item = resp['Item']
-        # Build new item with updated employee
-        new_sk = f"EMP#{new_employee}#{task_type}"
-        new_item = item.copy()
-        new_item['SK'] = new_sk
-        new_item['GSI1PK'] = new_employee
-        new_item['GSI1SK'] = parts[1]
-        new_item['GSI2PK'] = task_type
-        new_item['GSI2SK'] = f"{parts[1]}#{new_employee}"
-        new_item['created_at'] = datetime.now().isoformat()
-        new_item['status'] = data.get('status', new_item.get('status', 'scheduled'))
-        # Overwrite/put new item and delete old
-        table.put_item(Item=new_item)
-        table.delete_item(Key={'PK': pk, 'SK': sk})
+            item = resp['Item']
+            # Build new item with updated employee
+            new_sk = f"EMP#{new_employee}#{task_type}"
+            new_item = item.copy()
+            new_item['SK'] = new_sk
+            new_item['GSI1PK'] = new_employee
+            new_item['GSI1SK'] = parts[1]
+            new_item['GSI2PK'] = task_type
+            new_item['GSI2SK'] = f"{parts[1]}#{new_employee}"
+            new_item['created_at'] = datetime.now().isoformat()
+            new_item['status'] = data.get('status', new_item.get('status', 'scheduled'))
+            # Overwrite/put new item and delete old
+            table.put_item(Item=new_item)
+            table.delete_item(Key={'PK': pk, 'SK': sk})
+            return {
+                'statusCode': 200,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'message': 'Shift reassigned successfully'})
+            }
+    
+        # Otherwise perform attribute updates on the existing item
+        update_expression = "SET "
+        expression_values = {}
+        for key, value in data.items():
+            update_expression += f"{key} = :{key}, "
+            expression_values[f":{key}"] = value
+        update_expression = update_expression.rstrip(', ')
+        
+        if not expression_values:
+            return {
+                'statusCode': 400,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': 'No updates provided'})
+            }
+        
+        table.update_item(
+            Key={'PK': pk, 'SK': sk},
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=expression_values
+        )
+        
         return {
             'statusCode': 200,
             'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-            'body': json.dumps({'message': 'Shift reassigned successfully'})
+            'body': json.dumps({'message': 'Shift updated successfully'})
         }
-    
-    # Otherwise perform attribute updates on the existing item
-    update_expression = "SET "
-    expression_values = {}
-    for key, value in data.items():
-        update_expression += f"{key} = :{key}, "
-        expression_values[f":{key}"] = value
-    update_expression = update_expression.rstrip(', ')
-    
-    if not expression_values:
-        return {
-            'statusCode': 400,
-            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-            'body': json.dumps({'error': 'No updates provided'})
-        }
-    
-    table.update_item(
-        Key={'PK': pk, 'SK': sk},
-        UpdateExpression=update_expression,
-        ExpressionAttributeValues=expression_values
-    )
-    
-    return {
-        'statusCode': 200,
-        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-        'body': json.dumps({'message': 'Shift updated successfully'})
-    }
     
     except Exception as e:
         return {
@@ -279,7 +280,7 @@ def update_shift(event):
         }
 
 def delete_shift(event):
-    shift_id = event['pathParameters']['id']
+    shift_id = unquote(event['pathParameters']['id'])
     
     try:
         # Parse shift_id: format is "SHIFT#date#employee_id#task_type"

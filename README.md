@@ -202,6 +202,35 @@ aws logs describe-log-groups --log-group-name-prefix "/aws/lambda/dairy"
 aws logs tail /aws/lambda/dairy-shift-crud-dev --follow
 ```
 
+## フロントエンド静的ホスティング
+
+### アーキテクチャ
+```
+[GitHub] → [GitHub Actions] → [S3] → [CloudFront] → [ユーザー]
+```
+
+### 主要コンポーネント
+- **S3**: 静的ファイルストレージ（非公開）
+- **CloudFront**: CDN配信（OAC使用）
+- **GitHub Actions**: 自動デプロイ
+- **CDK**: Infrastructure as Code
+
+### デプロイ手順
+詳細は [DEPLOY.md](DEPLOY.md) を参照
+
+```powershell
+# 1. CDK デプロイ
+cd cdk
+npm install
+cdk deploy
+
+# 2. GitHub Secrets 設定
+# AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME, CLOUDFRONT_DISTRIBUTION_ID
+
+# 3. 自動デプロイ
+# src/ ディレクトリの HTML/JS/CSS ファイルを編集してプッシュ
+```
+
 ## 今後の拡張予定
 
 - [ ] リアルタイム通知 (SNS/SES)

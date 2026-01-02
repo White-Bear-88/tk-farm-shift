@@ -79,6 +79,8 @@ def get_all_employees():
                 'skills': item.get('skills', []),
                 'vacation_days': int(item.get('vacation_days', 20)),
                 'cognite_user_id': item.get('cognite_user_id', ''),
+                'status': item.get('status', 'ACTIVE'),
+                'created_at': item.get('created_at', ''),
                 'deleted': item.get('deleted', False)
             }
             employees.append(employee)
@@ -120,6 +122,8 @@ def create_employee(event):
         # 次のIDを3桁ゼロ埋めで生成
         employee_id = f"{max_id + 1:03d}"
         
+        from datetime import datetime
+        
         item = {
             'PK': 'EMPLOYEE',
             'SK': employee_id,
@@ -129,7 +133,9 @@ def create_employee(event):
             'email': data.get('email', ''),
             'skills': data.get('skills', []),
             'vacation_days': data.get('vacation_days', 20),
-            'cognite_user_id': data.get('cognite_user_id', '')
+            'cognite_user_id': data.get('cognite_user_id', ''),
+            'status': 'PENDING_APPROVAL',
+            'created_at': datetime.now().isoformat()
         }
         
         table.put_item(Item=item)
@@ -168,7 +174,9 @@ def get_employee(employee_id):
             'email': item.get('email', ''),
             'skills': item.get('skills', []),
             'vacation_days': int(item.get('vacation_days', 20)),
-            'cognite_user_id': item.get('cognite_user_id', '')
+            'cognite_user_id': item.get('cognite_user_id', ''),
+            'status': item.get('status', 'ACTIVE'),
+            'created_at': item.get('created_at', '')
         }
         
         return {
@@ -196,7 +204,9 @@ def update_employee(employee_id, event):
             'email': data.get('email', ''),
             'skills': data.get('skills', []),
             'vacation_days': data.get('vacation_days', 20),
-            'cognite_user_id': data.get('cognite_user_id', '')
+            'cognite_user_id': data.get('cognite_user_id', ''),
+            'status': data.get('status', 'ACTIVE'),
+            'created_at': data.get('created_at', '')
         }
         
         table.put_item(Item=item)
