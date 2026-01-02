@@ -443,19 +443,22 @@
             </div>
 
             <!-- シフト時間帯フィルタ -->
-            <div class="form-group" style="margin-bottom:15px; padding:10px; background:#f0f0f0; border-radius:5px;">
-                <label style="margin-bottom:8px;">シフト時間帯:</label>
-                <div style="display: flex; gap: 20px;">
-                    <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer;">
+            <div class="form-group" style="margin-bottom:10px; padding:10px; background:#f0f0f0; border-radius:5px;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <label style="margin:0; font-weight:bold;">シフト時間帯:</label>
+                    <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer; margin:0;">
                         <input type="radio" name="shiftTimeFilter" value="morning" checked onchange="filterShiftsByTime()" style="margin-right: 5px;">
                         午前
                     </label>
-                    <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer;">
+                    <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer; margin:0;">
                         <input type="radio" name="shiftTimeFilter" value="afternoon" onchange="filterShiftsByTime()" style="margin-right: 5px;">
                         午後
                     </label>
                 </div>
             </div>
+            
+            <!-- 作業種別毎の合計人数 -->
+            <div id="taskSummary" style="margin-bottom:15px; padding:8px; background:#e8f5e9; border-radius:5px; font-size:14px; color:#333;"></div>
 
             <!-- シフト一覧 -->
             <div id="dayShiftsList" style="margin-bottom:20px; max-height:300px; overflow-y:auto; border:1px solid #ddd; border-radius:5px; padding:10px; background:#fafafa;"></div>
@@ -464,21 +467,20 @@
                 <input type="hidden" id="shiftId">
 
                 <div class="form-group">
-                    <label>作業種別:</label>
-                    <select id="taskSelect" required>
-                        <option value="">作業を選択</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
                     <label>従業員:</label>
                     <select id="employeeSelect" required>
                         <option value="">従業員を選択</option>
                     </select>
                 </div>
 
-                <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-                    <div class="form-group">
+                <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; align-items: end;">
+                    <div class="form-group" style="margin:0;">
+                        <label>作業種別:</label>
+                        <select id="taskSelect" required>
+                            <option value="">作業を選択</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;">
                         <label>作業開始時間:</label>
                         <div style="display: flex; gap: 3px; align-items: center;">
                             <select id="startHour" style="width: 70px; text-align: center;"></select>
@@ -486,7 +488,7 @@
                             <select id="startMinute" style="width: 70px; text-align: center;"></select>
                         </div>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="margin:0;">
                         <label>作業終了時間:</label>
                         <div style="display: flex; gap: 3px; align-items: center;">
                             <select id="endHour" style="width: 70px; text-align: center;"></select>
@@ -1271,7 +1273,7 @@
                 // 既存シフトをチェック
                 const existingShifts = await checkExistingShifts(monthValue);
                 if (existingShifts && existingShifts.length > 0) {
-                    if (!confirm('既に登録データがありますが、上書きしますか？')) {
+                    if (!confirm('既に登録データがありますがよろしいですか？')) {
                         if (button) {
                             button.disabled = false;
                             setButtonLoading(button, false);
@@ -1285,6 +1287,11 @@
                 
                 // シフトを生成
                 const shifts = await generateShiftsLocally(monthValue);
+                
+                console.log('生成されたシフト総数:', shifts.length);
+                console.log('午前シフト:', shifts.filter(s => s.shift_type === 'morning').length);
+                console.log('午後シフト:', shifts.filter(s => s.shift_type === 'afternoon').length);
+                console.log('サンプルシフト:', shifts.slice(0, 5));
                 
                 if (shifts && shifts.length > 0) {
                     // グローバル変数に保存
@@ -1459,11 +1466,19 @@
         
         // 生成されたシフトをカレンダーにプレビュー表示（確定前）
         function displayGeneratedShiftsPreview(monthValue, shifts) {
+            console.log('displayGeneratedShiftsPreview called:', {monthValue, shiftsCount: shifts.length});
+            console.log('プレビューシフトのshift_type分布:', {
+                morning: shifts.filter(s => s.shift_type === 'morning').length,
+                afternoon: shifts.filter(s => s.shift_type === 'afternoon').length,
+                undefined: shifts.filter(s => !s.shift_type).length
+            });
+            
             // カレンダーを選択された月に切り替え
             document.getElementById('calendarMonth').value = monthValue;
             
             // 生成したシフトを一時的にグローバルに保存してカレンダー表示で使用
             window.previewShifts = shifts;
+            window.previewMonth = monthValue;
             
             // カレンダーを更新して生成されたシフトを表示
             updateShiftCalendar();
@@ -1961,7 +1976,10 @@
         function filterShiftsByTime() {
             const selectedTime = document.querySelector('input[name="shiftTimeFilter"]:checked')?.value || 'morning';
             const listDiv = document.getElementById('dayShiftsList');
+            const summaryDiv = document.getElementById('taskSummary');
             const allShifts = window.allShiftsForDay || [];
+            
+            console.log('filterShiftsByTime called:', {selectedTime, allShifts: allShifts.length});
             
             // shift_typeまたはstart_timeで午前・午後を判定
             const filteredShifts = allShifts.filter(s => {
@@ -1973,6 +1991,26 @@
                 }
                 return true; // shift_typeもstart_timeもない場合は表示
             });
+
+            console.log('filteredShifts:', filteredShifts.length);
+
+            // 作業種別毎の人数を集計
+            const taskCounts = {};
+            filteredShifts.forEach(s => {
+                const taskName = getTaskName(s.task_type);
+                taskCounts[taskName] = (taskCounts[taskName] || 0) + 1;
+            });
+
+            // 合計人数を表示
+            if (Object.keys(taskCounts).length > 0) {
+                const summaryText = Object.entries(taskCounts)
+                    .map(([taskName, count]) => `${taskName}${count}人`)
+                    .join('、');
+                summaryDiv.innerHTML = `<strong>作業種別毎の人数:</strong> ${summaryText}`;
+                summaryDiv.style.display = 'block';
+            } else {
+                summaryDiv.style.display = 'none';
+            }
 
             if (filteredShifts.length === 0) {
                 listDiv.innerHTML = '<p style="text-align:center; color:#999; padding:20px;">該当するシフトがありません</p>';
@@ -2053,7 +2091,7 @@
         }
 
         // When a shift checkbox is toggled, populate the form for editing (single selection behavior)
-        function onShiftCheckboxChange(checkbox, shiftId) {
+        async function onShiftCheckboxChange(checkbox, shiftId) {
             // Uncheck other checkboxes (single select for edit)
             document.querySelectorAll('.shift-checkbox').forEach(cb => {
                 if (cb !== checkbox) cb.checked = false;
@@ -2096,12 +2134,26 @@
             // Refresh employee select to include the selected employee even if already registered
             refreshEmployeeSelectForDate(shift.date, shift.employee_id);
 
-            // Set employee and populate tasks
-            document.getElementById('employeeSelect').value = shift.employee_id;
-            // Wait a tick for employee change to populate task select
-            setTimeout(() => {
-                document.getElementById('taskSelect').value = shift.task_type;
-            }, 0);
+            // Set employee and wait for tasks to be populated
+            const employeeSelect = document.getElementById('employeeSelect');
+            employeeSelect.value = shift.employee_id;
+            
+            // Trigger change event and wait for it to complete
+            const changeEvent = new Event('change');
+            employeeSelect.dispatchEvent(changeEvent);
+            
+            // Wait for tasks to be loaded, then set task value
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Set task type after tasks are loaded
+            const taskSelect = document.getElementById('taskSelect');
+            taskSelect.value = shift.task_type;
+            
+            // If task wasn't set (not in the list), try again after a bit more time
+            if (!taskSelect.value && shift.task_type) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+                taskSelect.value = shift.task_type;
+            }
 
             // selectに値を設定
             setTimeSelects('startHour', 'startMinute', shift.start_time || '');

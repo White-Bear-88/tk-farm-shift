@@ -233,6 +233,15 @@
         </div>
 
         <div class="section">
+            <h2>従業員登録申請一覧</h2>
+            <div id="pendingEmployeesSpinner" style="display: block; padding: 20px 0; color: #666;">
+                <span class="spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                <span>読み込み中...</span>
+            </div>
+            <div id="pendingEmployeesList" class="employee-list" style="display: none;"></div>
+        </div>
+
+        <div class="section">
             <h2>従業員一覧 <span id="employeeCount" style="font-size: 0.9em; color: #666;"></span></h2>
             <div style="margin-bottom: 20px;">
                 <button onclick="openEmployeeModal()">従業員追加</button>
@@ -630,6 +639,33 @@
                 <div id="approveMessage" style="margin-top: 10px;"></div>
             </div>
         </div>
+
+        <!-- パスワード変更モーダル -->
+        <div id="passwordChangeModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closePasswordChangeModal()">&times;</span>
+                <h2>パスワード変更</h2>
+                <form id="passwordChangeForm">
+                    <div class="form-group">
+                        <label>対象ユーザー:</label>
+                        <p id="targetUserInfo" style="margin: 5px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;"></p>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPasswordAdmin">新しいパスワード:</label>
+                        <input type="password" id="newPasswordAdmin" required placeholder="8文字以上">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPasswordAdmin">パスワード確認:</label>
+                        <input type="password" id="confirmPasswordAdmin" required placeholder="パスワードを再入力">
+                    </div>
+                    <input type="hidden" id="targetEmployeeId">
+                    <input type="hidden" id="targetEmail">
+                    <button type="submit">パスワードを変更</button>
+                    <button type="button" onclick="closePasswordChangeModal()">キャンセル</button>
+                </form>
+                <div id="passwordChangeMessage" style="margin-top: 10px;"></div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -785,6 +821,125 @@
             }
         });
 
+        // 承認待ち従業員一覧読み込み
+        async function loadPendingEmployees() {
+            const spinner = document.getElementById('pendingEmployeesSpinner');
+            const listDiv = document.getElementById('pendingEmployeesList');
+            
+            try {
+                spinner.style.display = 'block';
+                listDiv.style.display = 'none';
+                
+                const response = await fetch(`${API_BASE}/employees`);
+                const allEmployees = await response.json();
+                
+                const pendingEmployees = allEmployees.filter(emp => emp.status === 'PENDING_APPROVAL');
+                
+                spinner.style.display = 'none';
+                listDiv.style.display = 'grid';
+                
+                if (pendingEmployees.length === 0) {
+                    listDiv.innerHTML = '<p>承認待ちの登録申請はありません</p>';
+                } else {
+                    listDiv.innerHTML = pendingEmployees.map(emp => {
+                        const escapedId = emp.employee_id.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        const kanaDisplay = emp.kana_name ? ` (${emp.kana_name})` : '';
+                        return `
+                        <div class="employee-card" style="border-left-color: #ffc107; background: #fff3cd;">
+                            <p style="margin: 0 0 5px 0; font-size: 12px; color: #856404;">従業員ID：${emp.employee_id} <span style="color: #dc3545; font-weight: bold;">[承認待ち]</span></p>
+                            <h4 style="margin: 0 0 10px 0; color: #856404;">${emp.name}${kanaDisplay}</h4>
+                            <p style="color: #856404;"><strong>電話:</strong> ${emp.phone || '未設定'}</p>
+                            <p style="color: #856404;"><strong>メール:</strong> ${emp.email || '未設定'}</p>
+                            <p style="color: #856404;"><strong>申請日:</strong> ${new Date(emp.created_at).toLocaleDateString('ja-JP')}</p>
+                            <button onclick="approveEmployee('${escapedId}')" style="background: #28a745; color: white; margin-right: 10px;">承認</button>
+                            <button class="btn-danger" onclick="rejectEmployee('${escapedId}')">reject</button>
+                        </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                spinner.style.display = 'none';
+                listDiv.style.display = 'grid';
+                listDiv.innerHTML = `<div class="error">エラー: ${error.message}</div>`;
+            }
+        }
+
+        // 従業員承認
+        async function approveEmployee(employeeId) {
+            if (!confirm('この従業員を承認しますか？')) return;
+            
+            try {
+                const getResponse = await fetch(`${API_BASE}/employees/${employeeId}`);
+                const employee = await getResponse.json();
+                
+                employee.status = 'APPROVED';
+                
+                const updateResponse = await fetch(`${API_BASE}/employees/${employeeId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(employee)
+                });
+                
+                if (updateResponse.ok) {
+                    // CogniteIDユーザーも有効化
+                    const cogniteResponse = await fetch(`${API_BASE}/cognite-users`);
+                    const cogniteUsers = await cogniteResponse.json();
+                    const cogniteUser = cogniteUsers.find(u => u.employee_id === employeeId);
+                    
+                    if (cogniteUser) {
+                        cogniteUser.is_active = true;
+                        cogniteUser.status = 'APPROVED';
+                        
+                        await fetch(`${API_BASE}/cognite-users/${cogniteUser.cognite_user_id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(cogniteUser)
+                        });
+                    }
+                    
+                    showMessage('employeeListMessage', 'success', '✓ 従業員を承認しました。');
+                    loadPendingEmployees();
+                    loadEmployees();
+                } else {
+                    throw new Error('承認に失敗しました');
+                }
+            } catch (error) {
+                showMessage('employeeListMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
+        // 従業員拒否
+        async function rejectEmployee(employeeId) {
+            if (!confirm('この従業員申請を拒否しますか？データは削除されます。')) return;
+            
+            try {
+                // 従業員データを削除
+                const deleteEmpResponse = await fetch(`${API_BASE}/employees/${employeeId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (deleteEmpResponse.ok) {
+                    // CogniteIDユーザーも削除
+                    const cogniteResponse = await fetch(`${API_BASE}/cognite-users`);
+                    const cogniteUsers = await cogniteResponse.json();
+                    const cogniteUser = cogniteUsers.find(u => u.employee_id === employeeId);
+                    
+                    if (cogniteUser) {
+                        await fetch(`${API_BASE}/cognite-users/${cogniteUser.cognite_user_id}`, {
+                            method: 'DELETE'
+                        });
+                    }
+                    
+                    showMessage('employeeListMessage', 'success', '✓ 従業員申請を拒否しました。');
+                    loadPendingEmployees();
+                } else {
+                    throw new Error('拒否に失敗しました');
+                }
+            } catch (error) {
+                showMessage('employeeListMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+
         // 従業員一覧読み込み
         async function loadEmployees() {
             const spinner = document.getElementById('employeeListSpinner');
@@ -800,7 +955,7 @@
                 const allEmployees = await response.json();
                 
                 // 有効な従業員と削除済み従業員を分離
-                const activeEmployees = allEmployees.filter(emp => !emp.deleted);
+                const activeEmployees = allEmployees.filter(emp => !emp.deleted && emp.status !== 'PENDING_APPROVAL');
                 const deletedEmployees = allEmployees.filter(emp => emp.deleted);
                 
                 // 総人数を表示（有効な従業員のみ）
@@ -831,6 +986,7 @@
                                 ).join('') : ''}
                             </div>
                             <button onclick="editEmployee('${escapedId}')">編集</button>
+                            <button onclick="changePassword('${escapedId}', '${emp.email || ''}')">パスワード変更</button>
                             <button class="btn-danger" onclick="deleteEmployee('${escapedId}')">削除</button>
                         </div>
                         `;
@@ -1703,6 +1859,83 @@
             }
         }
 
+        // パスワード変更機能
+        function changePassword(employeeId, email) {
+            if (!email) {
+                alert('この従業員にはメールアドレスが設定されていません。');
+                return;
+            }
+            
+            document.getElementById('targetEmployeeId').value = employeeId;
+            document.getElementById('targetEmail').value = email;
+            document.getElementById('targetUserInfo').textContent = `ID: ${employeeId} (${email})`;
+            document.getElementById('newPasswordAdmin').value = '';
+            document.getElementById('confirmPasswordAdmin').value = '';
+            document.getElementById('passwordChangeMessage').innerHTML = '';
+            document.getElementById('passwordChangeModal').style.display = 'block';
+        }
+
+        function closePasswordChangeModal() {
+            document.getElementById('passwordChangeModal').style.display = 'none';
+        }
+
+        // パスワード変更フォーム送信
+        document.getElementById('passwordChangeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const newPassword = document.getElementById('newPasswordAdmin').value;
+            const confirmPassword = document.getElementById('confirmPasswordAdmin').value;
+            const targetEmail = document.getElementById('targetEmail').value;
+            
+            // バリデーション
+            if (newPassword !== confirmPassword) {
+                showMessage('passwordChangeMessage', 'error', 'パスワードが一致しません');
+                return;
+            }
+            
+            if (newPassword.length < 8) {
+                showMessage('passwordChangeMessage', 'error', 'パスワードは8文字以上で入力してください');
+                return;
+            }
+            
+            if (!confirm('このユーザーのパスワードを変更しますか？')) {
+                return;
+            }
+            
+            try {
+                // 管理者トークンを取得
+                const adminToken = localStorage.getItem('cognite_id_token');
+                if (!adminToken) {
+                    throw new Error('管理者権限が確認できません。再ログインしてください。');
+                }
+                
+                const response = await fetch(`${API_BASE}/auth/admin-change-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        target_email: targetEmail,
+                        new_password: newPassword,
+                        admin_token: adminToken
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('passwordChangeMessage', 'success', '✓ パスワードを変更しました。');
+                    setTimeout(() => {
+                        closePasswordChangeModal();
+                    }, 2000);
+                } else {
+                    throw new Error(result.error || 'パスワード変更に失敗しました');
+                }
+            } catch (error) {
+                showMessage('passwordChangeMessage', 'error', `エラー: ${error.message}`);
+            }
+        });
+
         // 休暇承認モーダルを開く
         function openApproveVacationModal(requestId, employeeName, startDate, endDate, vacationType, timeType, status, reason, employeeId) {
             document.getElementById('approveRequestId').value = requestId;
@@ -1836,6 +2069,7 @@
 
         // ページ読み込み時に従業員一覧を表示
         document.addEventListener('DOMContentLoaded', () => {
+            loadPendingEmployees();
             loadEmployees();
             loadDefaultVacation();
             loadAllVacationRequests();

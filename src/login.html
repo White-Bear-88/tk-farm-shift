@@ -51,22 +51,25 @@
             width: 100%;
             padding: 15px;
             border: none;
-            border-radius: 5px;
+            border-radius: 25px;
             font-size: 16px;
             cursor: pointer;
             margin: 10px 0;
-            background: #007bff;
+            background: linear-gradient(45deg, #667eea, #764ba2);
             color: white;
+            transition: all 0.3s ease;
         }
         .btn:hover {
-            background: #0056b3;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
         .btn-primary {
-            background: #007bff;
+            background: linear-gradient(45deg, #667eea, #764ba2);
             color: white;
         }
         .btn-primary:hover {
-            background: #0056b3;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
         .btn-secondary {
             background: #6c757d;
@@ -149,24 +152,20 @@
                     <input type="password" id="password" required>
                 </div>
                 
-                <button type="submit" id="loginBtn">ログイン</button>
+                <button type="submit" id="loginBtn" class="btn btn-primary">ログイン</button>
             </form>
             <div id="message" class="message"></div>
         </div>
         
-        <div class="divider">
-            <span>または</span>
-        </div>
-        
         <div class="login-method">
-            <h3>開発用ログイン</h3>
-            <button class="btn btn-secondary" onclick="location.href='login-dev.html'">
-                開発用ログイン画面
+            <h3>初回登録</h3>
+            <p>新しく従業員として登録する方はこちら</p>
+            <button class="btn btn-primary" onclick="location.href='employee-register.html'">
+                従業員登録
             </button>
         </div>
     </div>
 
-    <script src="cognite-auth-config.js"></script>
     <script>
         const API_BASE_URL = 'https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev';
 
@@ -186,11 +185,7 @@
                 const userExists = await checkUserExists(email);
                 
                 if (!userExists) {
-                    // 未登録の場合はCognite認証登録画面へ
-                    showMessage('アカウントが見つかりません。新規登録画面に移動します...', 'info');
-                    setTimeout(() => {
-                        window.location.href = `cognite-register.html?email=${encodeURIComponent(email)}`;
-                    }, 2000);
+                    showMessage('アカウントが見つかりません。従業員登録を行ってください。', 'error');
                     return;
                 }
                 
@@ -248,22 +243,6 @@
         }
 
         async function authenticateWithCognite(email, password) {
-            // 開発環境での簡易認証
-            if (email === 'admin@example.com' && password === 'password') {
-                return {
-                    success: true,
-                    token: 'dev_token_' + Date.now(),
-                    user: {
-                        cognite_user_id: 'usr7wyygjep',
-                        name: '酪農太郎',
-                        email: email,
-                        role: 'admin',
-                        is_active: true,
-                        employee_info: { employee_id: '001' }
-                    }
-                };
-            }
-            
             // データベースでの認証
             try {
                 const response = await fetch(`${API_BASE_URL}/auth/cognite-login`, {

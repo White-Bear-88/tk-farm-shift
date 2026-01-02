@@ -567,10 +567,20 @@ Resources:
         Fn::Sub: dairy-auth-service-${Environment}
       CodeUri: AuthServiceFunction
       Handler: auth_service.lambda_handler
+      Environment:
+        Variables:
+          SENDER_EMAIL: noreply@example.com
       Policies:
       - DynamoDBCrudPolicy:
           TableName:
             Ref: ShiftManagementTable
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - ses:SendEmail
+          - ses:SendRawEmail
+          Resource: '*'
       Events:
         VerifyToken:
           Type: Api
@@ -614,6 +624,34 @@ Resources:
               Ref: ShiftManagementApi
             Path: /auth/me
             Method: GET
+        EmployeeRegister:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /auth/employee-register
+            Method: POST
+        PasswordResetRequest:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /auth/password-reset-request
+            Method: POST
+        PasswordReset:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /auth/password-reset
+            Method: POST
+        PasswordResetDirect:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /auth/password-reset-direct
+            Method: POST
     Metadata:
       SamResourceId: AuthServiceFunction
 Outputs:

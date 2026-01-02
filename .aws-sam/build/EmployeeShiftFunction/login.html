@@ -51,22 +51,25 @@
             width: 100%;
             padding: 15px;
             border: none;
-            border-radius: 5px;
+            border-radius: 25px;
             font-size: 16px;
             cursor: pointer;
             margin: 10px 0;
-            background: #007bff;
+            background: linear-gradient(45deg, #667eea, #764ba2);
             color: white;
+            transition: all 0.3s ease;
         }
         .btn:hover {
-            background: #0056b3;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
         .btn-primary {
-            background: #007bff;
+            background: linear-gradient(45deg, #667eea, #764ba2);
             color: white;
         }
         .btn-primary:hover {
-            background: #0056b3;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
         .btn-secondary {
             background: #6c757d;
@@ -149,9 +152,20 @@
                     <input type="password" id="password" required>
                 </div>
                 
-                <button type="submit" id="loginBtn">ログイン</button>
+                <button type="submit" id="loginBtn" class="btn btn-primary">ログイン</button>
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="password-reset.html" style="color: #666; text-decoration: none; font-size: 14px;">パスワードを忘れた方はこちら</a>
+                </div>
             </form>
             <div id="message" class="message"></div>
+        </div>
+        
+        <div class="login-method">
+            <h3>初回登録</h3>
+            <p>新しく従業員として登録する方はこちら</p>
+            <button class="btn btn-primary" onclick="location.href='employee-register.html'">
+                従業員登録
+            </button>
         </div>
         
         <div class="divider">

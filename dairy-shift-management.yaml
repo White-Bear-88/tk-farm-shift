@@ -493,6 +493,9 @@ Resources:
       FunctionName: !Sub 'dairy-auth-service-${Environment}'
       CodeUri: src/
       Handler: auth_service.lambda_handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ShiftManagementTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ShiftManagementTable
@@ -533,6 +536,18 @@ Resources:
             RestApiId: !Ref ShiftManagementApi
             Path: /auth/me
             Method: GET
+        EmployeeRegister:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /auth/employee-register
+            Method: POST
+        AdminChangePassword:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ShiftManagementApi
+            Path: /auth/admin-change-password
+            Method: POST
 
 Outputs:
   CognitoUserPoolId:

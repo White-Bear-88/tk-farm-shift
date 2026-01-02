@@ -51,6 +51,10 @@ def lambda_handler(event, context):
             return cognite_login(json.loads(event['body']))
         elif method == 'POST' and path == '/auth/cognite-register':
             return cognite_register(json.loads(event['body']))
+        elif method == 'POST' and path == '/auth/employee-register':
+            return employee_register(json.loads(event['body']))
+        elif method == 'POST' and path == '/auth/admin-change-password':
+            return admin_change_password(json.loads(event['body']))
         elif method == 'GET' and path == '/auth/me':
             return get_current_user(event)
         
@@ -400,7 +404,198 @@ def cognite_register(data):
             'body': json.dumps({'success': False, 'error': str(e)})
         }
 
-def get_current_user(event):
+def employee_register(data):
+    """従業員登録申請（管理者承認待ち状態で作成）"""
+    try:
+        email = data.get('email')
+        name = data.get('name')
+        kana_name = data.get('kana_name')
+        phone = data.get('phone')
+        password = data.get('password')
+        
+        if not all([email, name, kana_name, phone, password]):
+            return {
+                'statusCode': 400,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': 'All fields are required'})
+            }
+        
+        # 既存ユーザーチェック
+        response = table.scan(
+            FilterExpression='begins_with(PK, :pk) AND email = :email',
+            ExpressionAttributeValues={
+                ':pk': 'COGNITE_USER#',
+                ':email': email
+            }
+        )
+        
+        if len(response['Items']) > 0:
+            return {
+                'statusCode': 409,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'success': False, 'error': 'User already exists'})
+            }
+        
+        # 従業員IDを生成
+        import random
+        import string
+        employee_id = ''.join(random.choices(string.digits, k=3))
+        
+        # 重複チェック
+        while True:
+            existing = table.get_item(
+                Key={'PK': 'EMPLOYEE', 'SK': employee_id}
+            )
+            if 'Item' not in existing:
+                break
+            employee_id = ''.join(random.choices(string.digits, k=3))
+        
+        # CogniteIDを生成
+        cognite_user_id = 'usr' + ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        
+        from datetime import datetime
+        
+        # 従業員レコードを作成（承認待ち状態）
+        employee_item = {
+            'PK': 'EMPLOYEE',
+            'SK': employee_id,
+            'employee_id': employee_id,
+            'name': name,
+            'kana_name': kana_name,
+            'phone': phone,
+            'email': email,
+            'skills': [],
+            'vacation_days': 20,
+            'status': 'PENDING_APPROVAL',  # 承認待ち
+            'created_at': datetime.now().isoformat(),
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        # CogniteIDユーザーレコードを作成（非アクティブ状態）
+        cognite_item = {
+            'PK': f'COGNITE_USER#{cognite_user_id}',
+            'SK': 'PROFILE',
+            'cognite_user_id': cognite_user_id,
+            'email': email,
+            'name': name,
+            'password': password,
+            'role': 'employee',
+            'employee_id': employee_id,
+            'is_active': False,  # 非アクティブ
+            'status': 'PENDING_APPROVAL',  # 承認待ち
+            'created_at': datetime.now().isoformat(),
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        # データベースに保存
+        table.put_item(Item=employee_item)
+        table.put_item(Item=cognite_item)
+        
+        return {
+            'statusCode': 201,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({
+                'success': True,
+                'employee_id': employee_id,
+                'cognite_user_id': cognite_user_id,
+                'message': 'Employee registration submitted for approval'
+            })
+        }
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'success': False, 'error': str(e)})
+        }
+
+def admin_change_password(data):
+    """管理者によるパスワード変更"""
+    try:
+        target_email = data.get('target_email')
+        new_password = data.get('new_password')
+        admin_token = data.get('admin_token')
+        
+        if not all([target_email, new_password, admin_token]):
+            return {
+                'statusCode': 400,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': 'Target email, new password, and admin token are required'})
+            }
+        
+        # 管理者権限を確認
+        if not admin_token.startswith('cognite_token_'):
+            return {
+                'statusCode': 401,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'success': False, 'error': 'Invalid admin token'})
+            }
+        
+        # トークンから管理者IDを取得
+        try:
+            parts = admin_token.split('_')
+            admin_user_id = parts[2] if len(parts) > 2 else None
+        except:
+            admin_user_id = None
+            
+        if not admin_user_id:
+            return {
+                'statusCode': 401,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'success': False, 'error': 'Invalid admin token'})
+            }
+        
+        # 管理者情報を取得
+        admin_user = get_cognite_user_by_id(admin_user_id)
+        if not admin_user or admin_user.get('role') != 'admin':
+            return {
+                'statusCode': 403,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'success': False, 'error': 'Admin privileges required'})
+            }
+        
+        # 対象ユーザーを検索
+        response = table.scan(
+            FilterExpression='begins_with(PK, :pk) AND email = :email',
+            ExpressionAttributeValues={
+                ':pk': 'COGNITE_USER#',
+                ':email': target_email
+            }
+        )
+        
+        if len(response['Items']) == 0:
+            return {
+                'statusCode': 404,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'success': False, 'error': 'Target user not found'})
+            }
+        
+        user_item = response['Items'][0]
+        
+        # パスワードを更新
+        from datetime import datetime
+        user_item['password'] = new_password
+        user_item['updated_at'] = datetime.now().isoformat()
+        
+        table.put_item(Item=user_item)
+        
+        return {
+            'statusCode': 200,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({
+                'success': True,
+                'message': 'Password updated successfully by admin'
+            })
+        }
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'success': False, 'error': str(e)})
+        }
+
+
     """現在のユーザー情報を取得（JWTからsubを抽出）"""
     try:
         # AuthorizationヘッダーからJWTトークンを取得
