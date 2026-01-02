@@ -53,12 +53,8 @@ def lambda_handler(event, context):
             return cognite_register(json.loads(event['body']))
         elif method == 'POST' and path == '/auth/employee-register':
             return employee_register(json.loads(event['body']))
-        elif method == 'POST' and path == '/auth/password-reset-request':
-            return password_reset_request(json.loads(event['body']))
-        elif method == 'POST' and path == '/auth/password-reset':
-            return password_reset(json.loads(event['body']))
-        elif method == 'POST' and path == '/auth/password-reset-direct':
-            return password_reset_direct(json.loads(event['body']))
+        elif method == 'POST' and path == '/auth/admin-change-password':
+            return admin_change_password(json.loads(event['body']))
         elif method == 'GET' and path == '/auth/me':
             return get_current_user(event)
         
@@ -275,6 +271,57 @@ def cognite_login(data):
                 ':email': email
             }
         )
+        
+        # 開発用管理者アカウントの特別処理
+        if email == 'admin@example.com':
+            if len(response['Items']) == 0:
+                # 開発用管理者アカウントが存在しない場合は作成
+                cognite_user_id = 'admin001'
+                
+                from datetime import datetime
+                admin_item = {
+                    'PK': f'COGNITE_USER#{cognite_user_id}',
+                    'SK': 'PROFILE',
+                    'cognite_user_id': cognite_user_id,
+                    'email': email,
+                    'name': '管理者',
+                    'password': password,
+                    'role': 'admin',
+                    'employee_id': '',
+                    'is_active': True,
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat()
+                }
+                
+                table.put_item(Item=admin_item)
+                
+                # JWTトークンを生成
+                token = f"cognite_token_{cognite_user_id}_{int(time.time())}"
+                
+                user_profile = {
+                    'cognite_user_id': cognite_user_id,
+                    'name': '管理者',
+                    'email': email,
+                    'role': 'admin',
+                    'is_active': True,
+                    'employee_info': None
+                }
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                    'body': json.dumps({
+                        'success': True,
+                        'token': token,
+                        'user': user_profile
+                    }, default=decimal_default)
+                }
+            else:
+                # 既存の管理者アカウントのロールを確認・更新
+                user_item = response['Items'][0]
+                if user_item.get('role') != 'admin':
+                    user_item['role'] = 'admin'
+                    table.put_item(Item=user_item)
         
         if len(response['Items']) == 0:
             return {
@@ -513,273 +560,57 @@ def employee_register(data):
             'body': json.dumps({'success': False, 'error': str(e)})
         }
 
-def password_reset_request(data):
-    """パスワード再設定メール送信要求"""
+def admin_change_password(data):
+    """管理者によるパスワード変更"""
     try:
-        email = data.get('email')
-        if not email:
+        target_email = data.get('target_email')
+        new_password = data.get('new_password')
+        admin_token = data.get('admin_token')
+        
+        if not all([target_email, new_password, admin_token]):
             return {
                 'statusCode': 400,
                 'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({'error': 'Email is required'})
+                'body': json.dumps({'error': 'Target email, new password, and admin token are required'})
             }
         
-        # ユーザー存在確認
-        response = table.scan(
-            FilterExpression='begins_with(PK, :pk) AND email = :email',
-            ExpressionAttributeValues={
-                ':pk': 'COGNITE_USER#',
-                ':email': email
-            }
-        )
-        
-        if len(response['Items']) == 0:
+        # 管理者権限を確認
+        if not admin_token.startswith('cognite_token_'):
             return {
-                'statusCode': 404,
+                'statusCode': 401,
                 'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({'success': False, 'error': 'User not found'})
+                'body': json.dumps({'success': False, 'error': 'Invalid admin token'})
             }
         
-        user_item = response['Items'][0]
-        cognite_user_id = user_item['PK'].split('#')[1]
-        user_name = user_item.get('name', '')
-        
-        # リセットトークンを生成
-        import random
-        import string
-        reset_token = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
-        
-        from datetime import datetime, timedelta
-        expires_at = (datetime.now() + timedelta(hours=1)).isoformat()
-        
-        # リセットトークンを保存
-        reset_item = {
-            'PK': f'PASSWORD_RESET#{reset_token}',
-            'SK': 'TOKEN',
-            'cognite_user_id': cognite_user_id,
-            'email': email,
-            'expires_at': expires_at,
-            'created_at': datetime.now().isoformat()
-        }
-        
-        table.put_item(Item=reset_item)
-        
-        # メール送信
+        # トークンから管理者IDを取得
         try:
-            send_password_reset_email(email, user_name, reset_token)
+            parts = admin_token.split('_')
+            admin_user_id = parts[2] if len(parts) > 2 else None
+        except:
+            admin_user_id = None
+            
+        if not admin_user_id:
             return {
-                'statusCode': 200,
+                'statusCode': 401,
                 'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({
-                    'success': True,
-                    'message': 'Password reset email sent'
-                })
+                'body': json.dumps({'success': False, 'error': 'Invalid admin token'})
             }
-        except Exception as email_error:
-            print(f'Email sending failed: {email_error}')
-            # メール送信失敗時は開発環境用のトークンを返す
+        
+        # 管理者情報を取得
+        admin_user = get_cognite_user_by_id(admin_user_id)
+        if not admin_user or admin_user.get('role') != 'admin':
             return {
-                'statusCode': 200,
+                'statusCode': 403,
                 'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({
-                    'success': True,
-                    'message': 'Password reset email sent',
-                    'dev_token': reset_token  # 開発環境用
-                })
+                'body': json.dumps({'success': False, 'error': 'Admin privileges required'})
             }
         
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-            'body': json.dumps({'success': False, 'error': str(e)})
-        }
-
-def send_password_reset_email(email, user_name, reset_token):
-    """パスワード再設定メールを送信"""
-    import boto3
-    from botocore.exceptions import ClientError
-    
-    ses_client = boto3.client('ses', region_name='ap-northeast-1')
-    
-    # メールの内容を作成
-    reset_url = f"https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev/password-reset.html?token={reset_token}"
-    
-    subject = "【酒農シフト管理システム】パスワード再設定のご案内"
-    
-    body_text = f"""
-{user_name} 様
-
-酒農シフト管理システムでパスワード再設定のリクエストを受け付けました。
-
-以下のリンクをクリックして、新しいパスワードを設定してください。
-
-{reset_url}
-
-このリンクは1時間有効です。
-
-もしこのメールに心当たりがない場合は、このメールを無視してください。
-
-酒農シフト管理システム
-"""
-    
-    body_html = f"""
-<html>
-<head></head>
-<body>
-    <h2>パスワード再設定のご案内</h2>
-    <p>{user_name} 様</p>
-    <p>酒農シフト管理システムでパスワード再設定のリクエストを受け付けました。</p>
-    <p>以下のボタンをクリックして、新しいパスワードを設定してください。</p>
-    <p style="margin: 20px 0;">
-        <a href="{reset_url}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">パスワードを再設定</a>
-    </p>
-    <p><strong>このリンクは1時間有効です。</strong></p>
-    <p>もしこのメールに心当たりがない場合は、このメールを無視してください。</p>
-    <hr>
-    <p><small>酒農シフト管理システム</small></p>
-</body>
-</html>
-"""
-    
-    # 送信者メールアドレス（環境変数から取得、デフォルト値あり）
-    sender_email = os.environ.get('SENDER_EMAIL', 'noreply@example.com')
-    
-    try:
-        response = ses_client.send_email(
-            Destination={
-                'ToAddresses': [email],
-            },
-            Message={
-                'Body': {
-                    'Html': {
-                        'Charset': 'UTF-8',
-                        'Data': body_html,
-                    },
-                    'Text': {
-                        'Charset': 'UTF-8',
-                        'Data': body_text,
-                    },
-                },
-                'Subject': {
-                    'Charset': 'UTF-8',
-                    'Data': subject,
-                },
-            },
-            Source=sender_email,
-        )
-        print(f'Email sent successfully. Message ID: {response["MessageId"]}')
-        return response
-    except ClientError as e:
-        print(f'Error sending email: {e.response["Error"]["Message"]}')
-        raise e
-
-def password_reset(data):
-    """パスワード再設定実行"""
-    try:
-        token = data.get('token')
-        new_password = data.get('new_password')
-        
-        if not token or not new_password:
-            return {
-                'statusCode': 400,
-                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({'error': 'Token and new password are required'})
-            }
-        
-        # トークンを検証
-        token_response = table.get_item(
-            Key={
-                'PK': f'PASSWORD_RESET#{token}',
-                'SK': 'TOKEN'
-            }
-        )
-        
-        if 'Item' not in token_response:
-            return {
-                'statusCode': 400,
-                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({'success': False, 'error': 'Invalid or expired token'})
-            }
-        
-        token_item = token_response['Item']
-        
-        # 有効期限をチェック
-        from datetime import datetime
-        expires_at = datetime.fromisoformat(token_item['expires_at'])
-        if datetime.now() > expires_at:
-            return {
-                'statusCode': 400,
-                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({'success': False, 'error': 'Token has expired'})
-            }
-        
-        cognite_user_id = token_item['cognite_user_id']
-        
-        # ユーザーのパスワードを更新
-        user_response = table.get_item(
-            Key={
-                'PK': f'COGNITE_USER#{cognite_user_id}',
-                'SK': 'PROFILE'
-            }
-        )
-        
-        if 'Item' not in user_response:
-            return {
-                'statusCode': 404,
-                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({'success': False, 'error': 'User not found'})
-            }
-        
-        user_item = user_response['Item']
-        user_item['password'] = new_password
-        user_item['updated_at'] = datetime.now().isoformat()
-        
-        table.put_item(Item=user_item)
-        
-        # トークンを削除
-        table.delete_item(
-            Key={
-                'PK': f'PASSWORD_RESET#{token}',
-                'SK': 'TOKEN'
-            }
-        )
-        
-        return {
-            'statusCode': 200,
-            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-            'body': json.dumps({
-                'success': True,
-                'message': 'Password updated successfully'
-            })
-        }
-        
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-            'body': json.dumps({'success': False, 'error': str(e)})
-        }
-
-def password_reset_direct(data):
-    """直接パスワード変更（メール送信なし）"""
-    try:
-        email = data.get('email')
-        new_password = data.get('new_password')
-        
-        if not email or not new_password:
-            return {
-                'statusCode': 400,
-                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({'error': 'Email and new password are required'})
-            }
-        
-        # ユーザー存在確認
+        # 対象ユーザーを検索
         response = table.scan(
             FilterExpression='begins_with(PK, :pk) AND email = :email',
             ExpressionAttributeValues={
                 ':pk': 'COGNITE_USER#',
-                ':email': email
+                ':email': target_email
             }
         )
         
@@ -787,7 +618,7 @@ def password_reset_direct(data):
             return {
                 'statusCode': 404,
                 'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-                'body': json.dumps({'success': False, 'error': 'User not found'})
+                'body': json.dumps({'success': False, 'error': 'Target user not found'})
             }
         
         user_item = response['Items'][0]
@@ -804,7 +635,7 @@ def password_reset_direct(data):
             'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
             'body': json.dumps({
                 'success': True,
-                'message': 'Password updated successfully'
+                'message': 'Password updated successfully by admin'
             })
         }
         

@@ -254,8 +254,8 @@
             margin: 0;
             padding: 20px;
             border-radius: 10px;
-            width: 480px;
-            max-width: 100%;
+            width: 800px;
+            max-width: 95%;
             max-height: 80vh;
             overflow-y: auto;
             box-shadow: 0 6px 24px rgba(0,0,0,0.2);
@@ -430,27 +430,27 @@
     </div>
 
     <!-- シフト編集モーダル -->
-    <div id="shiftModal" class="modal">
-        <div class="modal-content">
+    <div id="shiftModal" class="modal" onclick="event.stopPropagation();">
+        <div class="modal-content" onclick="event.stopPropagation();">
             <span class="close" onclick="closeShiftModal()">&times;</span>
-            <h3>シフト編集</h3>
+            <h3>シフト編集　<span id="pastDateWarning" style="color: #dc3545; font-size: 14px; font-weight: normal; display: none;">過去日の編集はできません</span></h3>
 
             <!-- 日付表示 -->
-            <div class="form-group" style="margin-bottom:15px;">
-                <label>日付:</label>
-                <div id="shiftDateDisplay" style="font-weight:bold; font-size:16px; padding:6px 0; color:#333;"></div>
+            <div class="form-group" style="margin-bottom:15px; display: flex; align-items: center; gap: 10px;">
+                <label style="margin: 0;">日付:</label>
+                <div id="shiftDateDisplay" style="font-weight:bold; font-size:16px; color:#333;"></div>
                 <input type="hidden" id="shiftDate">
             </div>
 
             <!-- シフト時間帯フィルタ -->
             <div class="form-group" style="margin-bottom:10px; padding:10px; background:#f0f0f0; border-radius:5px;">
                 <div style="display: flex; align-items: center; gap: 20px;">
-                    <label style="margin:0; font-weight:bold;">シフト時間帯:</label>
-                    <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer; margin:0;">
+                    <label style="margin:0; font-weight:bold; white-space: nowrap;">シフト時間帯:</label>
+                    <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer; margin:0; white-space: nowrap;">
                         <input type="radio" name="shiftTimeFilter" value="morning" checked onchange="filterShiftsByTime()" style="margin-right: 5px;">
                         午前
                     </label>
-                    <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer; margin:0;">
+                    <label style="display: flex; align-items: center; font-weight: normal; cursor: pointer; margin:0; white-space: nowrap;">
                         <input type="radio" name="shiftTimeFilter" value="afternoon" onchange="filterShiftsByTime()" style="margin-right: 5px;">
                         午後
                     </label>
@@ -463,68 +463,69 @@
             <!-- シフト一覧 -->
             <div id="dayShiftsList" style="margin-bottom:20px; max-height:300px; overflow-y:auto; border:1px solid #ddd; border-radius:5px; padding:10px; background:#fafafa;"></div>
 
-            <form id="shiftForm">
-                <input type="hidden" id="shiftId">
-
-                <div class="form-group">
-                    <label>従業員:</label>
-                    <select id="employeeSelect" required>
-                        <option value="">従業員を選択</option>
-                    </select>
-                </div>
-
-                <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; align-items: end;">
-                    <div class="form-group" style="margin:0;">
-                        <label>作業種別:</label>
-                        <select id="taskSelect" required>
+            <!-- 新規シフト追加フォーム -->
+            <div style="border-top: 2px solid #ddd; padding-top: 15px; margin-top: 15px;">
+                <h4 style="margin: 0 0 15px 0; color: #333;">新規シフト追加</h4>
+                <form id="shiftForm">
+                    <input type="hidden" id="shiftId">
+                    
+                    <!-- 作業種別 -->
+                    <div class="form-row" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                        <label style="margin: 0; min-width: 100px;">作業種別:</label>
+                        <select id="taskSelect" required style="width: 150px; text-align: left;">
                             <option value="">作業を選択</option>
                         </select>
                     </div>
-                    <div class="form-group" style="margin:0;">
-                        <label>作業開始時間:</label>
-                        <div style="display: flex; gap: 3px; align-items: center;">
-                            <select id="startHour" style="width: 70px; text-align: center;"></select>
+                    
+                    <!-- 従業員 -->
+                    <div class="form-row" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                        <label style="margin: 0; min-width: 100px;">従業員名:</label>
+                        <select id="employeeSelect" required style="width: 200px; text-align: left;" disabled>
+                            <option value="">従業員を選択</option>
+                        </select>
+                    </div>
+
+                    <!-- 作業時間 -->
+                    <div class="form-row" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                        <label style="margin: 0; min-width: 100px;">作業時間:</label>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <select id="startHour" style="width: 70px; text-align: center;" disabled></select>
                             <span>:</span>
-                            <select id="startMinute" style="width: 70px; text-align: center;"></select>
+                            <select id="startMinute" style="width: 70px; text-align: center;" disabled></select>
+                            <span style="margin: 0 5px; color: #666;">～</span>
+                            <select id="endHour" style="width: 70px; text-align: center;" disabled></select>
+                            <span>:</span>
+                            <select id="endMinute" style="width: 70px; text-align: center;" disabled></select>
                         </div>
                     </div>
-                    <div class="form-group" style="margin:0;">
-                        <label>作業終了時間:</label>
-                        <div style="display: flex; gap: 3px; align-items: center;">
-                            <select id="endHour" style="width: 70px; text-align: center;"></select>
-                            <span>:</span>
-                            <select id="endMinute" style="width: 70px; text-align: center;"></select>
-                        </div>
+                    
+                    <!-- 旧フィールド（互換性のため非表示） -->
+                    <div style="display: none;">
+                        <input type="checkbox" id="morningShift">
+                        <input type="checkbox" id="afternoonShift">
+                        <select id="morningTaskSelect"></select>
+                        <select id="afternoonTaskSelect"></select>
+                        <select id="morningStartHour"></select>
+                        <select id="morningStartMinute"></select>
+                        <select id="morningEndHour"></select>
+                        <select id="morningEndMinute"></select>
+                        <select id="afternoonStartHour"></select>
+                        <select id="afternoonStartMinute"></select>
+                        <select id="afternoonEndHour"></select>
+                        <select id="afternoonEndMinute"></select>
+                        <div id="morningShiftSection"></div>
+                        <div id="afternoonShiftSection"></div>
                     </div>
-                </div>
-                
-                <!-- 旧フィールド（互換性のため非表示） -->
-                <div style="display: none;">
-                    <input type="checkbox" id="morningShift">
-                    <input type="checkbox" id="afternoonShift">
-                    <select id="morningTaskSelect"></select>
-                    <select id="afternoonTaskSelect"></select>
-                    <select id="morningStartHour"></select>
-                    <select id="morningStartMinute"></select>
-                    <select id="morningEndHour"></select>
-                    <select id="morningEndMinute"></select>
-                    <select id="afternoonStartHour"></select>
-                    <select id="afternoonStartMinute"></select>
-                    <select id="afternoonEndHour"></select>
-                    <select id="afternoonEndMinute"></select>
-                    <div id="morningShiftSection"></div>
-                    <div id="afternoonShiftSection"></div>
-                </div>
-                
-                <input type="hidden" id="shiftStatus" value="active">
-                <div class="modal-buttons">
-                    <button id="addBtn" type="submit" class="btn-success">追加</button>
-                    <button id="updateBtn" type="button" onclick="updateShift(event)" disabled>編集</button>
-                    <button id="deleteBtn" type="button" class="btn-danger" onclick="deleteSelectedShifts(event)" disabled>削除</button>
-                    <button id="cancelBtn" type="button" onclick="closeShiftModal()">閉じる</button>
-                </div>
-            </form>
-            <div id="modalMessage"></div>
+                    
+                    <input type="hidden" id="shiftStatus" value="active">
+                    <div class="modal-buttons">
+                        <button id="addBtn" type="submit" class="btn-success" disabled style="opacity: 0.6;">追加</button>
+                        <button id="updateBtn" type="button" onclick="updateShifts()" class="btn-primary">変更</button>
+                        <button id="cancelBtn" type="button" onclick="closeShiftModal()">閉じる</button>
+                    </div>
+                </form>
+                <div id="modalMessage"></div>
+            </div>
         </div>
     </div>
 
@@ -965,6 +966,14 @@
             setTimeSelects('afternoonEndHour', 'afternoonEndMinute', '');
             setTimeSelects('startHour', 'startMinute', '');
             setTimeSelects('endHour', 'endMinute', '');
+            
+            // 時間フィールドにchangeイベントを追加してバリデーション
+            ['startHour', 'startMinute', 'endHour', 'endMinute'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('change', validateAddShiftForm);
+                }
+            });
 
             // 現在の月を先に設定してカレンダーを表示
             setCurrentMonth();
@@ -1048,7 +1057,12 @@
                     dayDiv.classList.add('today');
                 }
                 
-                const dateStr = cellDate.toISOString().split('T')[0];
+                // タイムゾーンの影響を受けないように、年月日を直接フォーマット
+                const yearStr = cellDate.getFullYear();
+                const monthStr = String(cellDate.getMonth() + 1).padStart(2, '0');
+                const dayStr = String(cellDate.getDate()).padStart(2, '0');
+                const dateStr = `${yearStr}-${monthStr}-${dayStr}`;
+                
                 dayDiv.innerHTML = `<div class="day-number">${cellDate.getDate()}</div>`;
                 dayDiv.onclick = () => openShiftModal(dateStr);
                 cellsFragment.appendChild(dayDiv);
@@ -1095,7 +1109,7 @@
                             }
                             
                             const empName = employeesMap[s.employee_id] || s.employee_id;
-                            const previewLabel = s._preview ? ' (プレビュー)' : '';
+                            const previewLabel = s._preview ? ' (確定前)' : '';
                             return `<div class="shift-assignment${conflictClass}${previewClass}${shiftTypeClass}">${getTaskName(s.task_type)} — ${empName}${previewLabel}</div>`;
                         }).join('');
                         dayDiv.innerHTML += shiftsHtml;
@@ -1125,10 +1139,30 @@
             
             document.getElementById('shiftDate').value = date;
             document.getElementById('shiftDateDisplay').textContent = date;
-            // Initialize button states (add mode by default)
-            updateButtonStates(false);
+            
+            // 作業種別リストを読み込み
+            await loadTasksToFormSelect();
+            
             // Load shifts for date (server side) and include preview items
             await loadShiftsForDate(date);
+        }
+
+        // 作業種別をフォームのselectに読み込み
+        async function loadTasksToFormSelect() {
+            try {
+                const response = await fetch(`${API_BASE}/tasks`);
+                const tasks = await response.json();
+                const taskSelect = document.getElementById('taskSelect');
+                taskSelect.innerHTML = '<option value="">作業種別を選択</option>';
+                tasks.forEach(task => {
+                    const option = document.createElement('option');
+                    option.value = task.task_type;
+                    option.textContent = task.name;
+                    taskSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('作業種別の読み込みエラー:', error);
+            }
         }
 
         // シフトモーダルを閉じる
@@ -1136,11 +1170,9 @@
             const modal = document.getElementById('shiftModal');
             modal.classList.remove('is-open');
             modal.style.display = 'none';
-            document.getElementById('shiftForm').reset();
+            clearFormFields();
             document.getElementById('dayShiftsList').innerHTML = '';
             document.getElementById('modalMessage').innerHTML = '';
-            // Reset button states
-            updateButtonStates(false);
         }
 
         // 月が過去かどうか判定
@@ -1765,7 +1797,7 @@
                 tasks.forEach(task => {
                     const option = document.createElement('option');
                     option.value = task.task_type;
-                    option.textContent = `${task.name} (${task.task_type})`;
+                    option.textContent = task.name;
                     select.appendChild(option);
                 });
                 
@@ -1789,6 +1821,13 @@
         // シフト作成（追加ボタン用）
         document.getElementById('shiftForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // 確認ダイアログを表示
+            const employeeName = document.getElementById('employeeSelect').selectedOptions[0]?.textContent || '従業員';
+            const taskName = document.getElementById('taskSelect').selectedOptions[0]?.textContent || '作業';
+            if (!confirm(`${employeeName} を ${taskName} のシフトに追加しますか？`)) {
+                return;
+            }
             
             const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
             const employeeId = document.getElementById('employeeSelect').value;
@@ -1944,6 +1983,27 @@
             const listDiv = document.getElementById('dayShiftsList');
             listDiv.innerHTML = '<div class="loading-message"><span class="spinner"></span>シフトデータを読み込んでいます...</div>';
             const isPast = new Date(date) < new Date(new Date().toISOString().split('T')[0]);
+            
+            // 過去日の場合、警告を表示しボタンを無効化
+            const pastWarning = document.getElementById('pastDateWarning');
+            const addBtn = document.getElementById('addBtn');
+            const updateBtn = document.getElementById('updateBtn');
+            const taskSelect = document.getElementById('taskSelect');
+            
+            if (isPast) {
+                pastWarning.style.display = 'inline';
+                addBtn.disabled = true;
+                addBtn.style.opacity = '0.6';
+                updateBtn.disabled = true;
+                updateBtn.style.opacity = '0.6';
+                taskSelect.disabled = true;
+            } else {
+                pastWarning.style.display = 'none';
+                updateBtn.disabled = false;
+                updateBtn.style.opacity = '1';
+                taskSelect.disabled = false;
+                // 追加ボタンは validateAddShiftForm で制御されるので、ここでは有効化しない
+            }
 
             try {
                 const response = await fetch(`${API_BASE}/shifts/by-date/${date}`);
@@ -2015,39 +2075,80 @@
             if (filteredShifts.length === 0) {
                 listDiv.innerHTML = '<p style="text-align:center; color:#999; padding:20px;">該当するシフトがありません</p>';
             } else {
-                // テーブル形式で表示
+                // 過去日かどうかを判定
+                const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+                const isPast = new Date(date) < new Date(new Date().toISOString().split('T')[0]);
+                const deleteButtonStyle = isPast ? 
+                    'padding:4px 12px; background:#dc3545; color:white; border:none; border-radius:3px; cursor:not-allowed; font-size:12px; opacity:0.6;' :
+                    'padding:4px 12px; background:#dc3545; color:white; border:none; border-radius:3px; cursor:pointer; font-size:12px;';
+                const buttonDisabled = isPast ? 'disabled' : '';
+                
+                // テーブル形式で表示（プルダウン編集可能）
                 listDiv.innerHTML = `
                     <table style="width:100%; border-collapse:collapse;">
                         <thead>
                             <tr style="background:#f0f0f0; border-bottom:2px solid #ddd;">
-                                <th style="padding:8px; text-align:center; width:40px;"></th>
-                                <th style="padding:8px; text-align:left;">作業種別</th>
-                                <th style="padding:8px; text-align:left;">名前</th>
-                                <th style="padding:8px; text-align:center;">作業開始時間</th>
-                                <th style="padding:8px; text-align:center;">作業終了時間</th>
+                                <th style="padding:8px; text-align:left; white-space:nowrap;">従業員名</th>
+                                <th style="padding:8px; text-align:left; white-space:nowrap;">作業種別</th>
+                                <th style="padding:8px; text-align:left; white-space:nowrap;" colspan="2">作業時間</th>
+                                <th style="padding:8px; text-align:center; white-space:nowrap; width:80px;">操作</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${filteredShifts.map(s => {
-                                const empName = employeesMap[s.employee_id] || s.employee_id;
-                                const disabledAttr = s._preview ? 'disabled title="プレビュー中のため操作不可"' : '';
-                                const chkId = s.shift_id ? `chk_${s.shift_id}` : `chk_preview_${btoa(s.date + s.task_type).replace(/=/g,'')}`;
-                                const previewLabel = s._preview ? ' <span style="color:#ff9800; font-size:11px;">(プレビュー)</span>' : '';
+                            ${filteredShifts.map((s, index) => {
+                                const originalIndex = allShifts.indexOf(s);
+                                const rowId = s.shift_id ? `row_${s.shift_id}` : `row_preview_${originalIndex}`;
+                                const titleAttr = s._preview ? 'title="確定前のシフトです"' : '';
+                                const startParts = (s.start_time || '00:00').split(':');
+                                const endParts = (s.end_time || '00:00').split(':');
+                                
                                 return `
-                                    <tr style="border-bottom:1px solid #eee;">
-                                        <td style="padding:8px; text-align:center;">
-                                            <input type="checkbox" class="shift-checkbox" id="${chkId}" data-shift-id="${s.shift_id||''}" ${disabledAttr} onchange="onShiftCheckboxChange(this, '${s.shift_id||''}')">
+                                    <tr id="${rowId}" style="border-bottom:1px solid #eee;" data-shift-id="${s.shift_id||''}" data-shift-index="${originalIndex}" ${titleAttr}>
+                                        <td style="padding:8px; width:200px;">
+                                            <select class="row-employee-select" style="text-align:left; width:100%;" onchange="onRowEmployeeChange(this, '${rowId}')">
+                                                ${employeesData.map(emp => `
+                                                    <option value="${emp.employee_id}" ${emp.employee_id === s.employee_id ? 'selected' : ''}>
+                                                        ${emp.name || emp.kana_name}
+                                                    </option>
+                                                `).join('')}
+                                            </select>
                                         </td>
-                                        <td style="padding:8px;">${getTaskName(s.task_type)}${previewLabel}</td>
-                                        <td style="padding:8px;">${empName}</td>
-                                        <td style="padding:8px; text-align:center;">${s.start_time || '-'}</td>
-                                        <td style="padding:8px; text-align:center;">${s.end_time || '-'}</td>
+                                        <td style="padding:8px; width:120px;">
+                                            <select class="row-task-select" style="text-align:left; width:100%;">
+                                                <option value="">作業を選択</option>
+                                            </select>
+                                        </td>
+                                        <td style="padding:8px;" colspan="2">
+                                            <div style="display:flex; gap:8px; align-items:center;">
+                                                <div style="display:flex; gap:3px; align-items:center;">
+                                                    <select class="row-start-hour" style="width:60px; text-align:left;"></select>
+                                                    <span>:</span>
+                                                    <select class="row-start-minute" style="width:60px; text-align:left;"></select>
+                                                </div>
+                                                <span style="color:#666;">～</span>
+                                                <div style="display:flex; gap:3px; align-items:center;">
+                                                    <select class="row-end-hour" style="width:60px; text-align:left;"></select>
+                                                    <span>:</span>
+                                                    <select class="row-end-minute" style="width:60px; text-align:left;"></select>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style="padding:8px; text-align:center;">
+                                            <button type="button" onclick="deleteShiftRow('${rowId}', '${s.shift_id||''}', ${originalIndex})" style="${deleteButtonStyle}" ${buttonDisabled}>削除</button>
+                                        </td>
                                     </tr>
                                 `;
                             }).join('')}
                         </tbody>
                     </table>
                 `;
+                
+                // 各行のプルダウンを初期化
+                filteredShifts.forEach((s, index) => {
+                    const originalIndex = allShifts.indexOf(s);
+                    const rowId = s.shift_id ? `row_${s.shift_id}` : `row_preview_${originalIndex}`;
+                    initializeRowSelects(rowId, s);
+                });
             }
 
             // Ensure controls are not active during processing
@@ -2090,91 +2191,365 @@
             select.dispatchEvent(ev);
         }
 
-        // When a shift checkbox is toggled, populate the form for editing (single selection behavior)
-        async function onShiftCheckboxChange(checkbox, shiftId) {
-            // Uncheck other checkboxes (single select for edit)
+        // 行のプルダウンを初期化
+        async function initializeRowSelects(rowId, shiftData) {
+            const row = document.getElementById(rowId);
+            if (!row) return;
+            
+            const taskSelect = row.querySelector('.row-task-select');
+            const startHourSelect = row.querySelector('.row-start-hour');
+            const startMinuteSelect = row.querySelector('.row-start-minute');
+            const endHourSelect = row.querySelector('.row-end-hour');
+            const endMinuteSelect = row.querySelector('.row-end-minute');
+            
+            // 時間のプルダウンを初期化
+            const startParts = (shiftData.start_time || '00:00').split(':');
+            const endParts = (shiftData.end_time || '00:00').split(':');
+            
+            populateHourSelect(startHourSelect, startParts[0]);
+            populateMinuteSelect(startMinuteSelect, startParts[1]);
+            populateHourSelect(endHourSelect, endParts[0]);
+            populateMinuteSelect(endMinuteSelect, endParts[1]);
+            
+            // 従業員に基づいて作業種別を読み込み
+            await loadTasksForRowEmployee(taskSelect, shiftData.employee_id, shiftData.task_type);
+        }
+        
+        // 行の従業員選択時に対応可能な作業種別を読み込み
+        async function onRowEmployeeChange(selectElement, rowId) {
+            const employeeId = selectElement.value;
+            const row = document.getElementById(rowId);
+            if (!row) return;
+            
+            const taskSelect = row.querySelector('.row-task-select');
+            await loadTasksForRowEmployee(taskSelect, employeeId);
+        }
+        
+        // 従業員が対応可能な作業種別をselectに読み込み
+        async function loadTasksForRowEmployee(taskSelect, employeeId, selectedTaskType = '') {
+            if (!taskSelect || !employeeId) {
+                console.log('loadTasksForRowEmployee: taskSelect or employeeId is missing', {taskSelect, employeeId});
+                return;
+            }
+            
+            console.log('loadTasksForRowEmployee called:', {employeeId, selectedTaskType});
+            
+            // スキルのマッピング（文字列形式と数字形式の両方をサポート）
+            const skillMapping = {
+                'milking': '1',
+                'feeding': '2',
+                'cleaning': '3',
+                'patrol': '4',
+                '1': '1',
+                '2': '2',
+                '3': '3',
+                '4': '4'
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/employees/${employeeId}`);
+                if (!response.ok) {
+                    throw new Error(`Employee fetch failed: ${response.status}`);
+                }
+                const employee = await response.json();
+                
+                console.log('Employee data:', employee);
+                
+                taskSelect.innerHTML = '<option value="">作業を選択</option>';
+                
+                if (employee.skills && employee.skills.length > 0) {
+                    const allTasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
+                    
+                    console.log('All tasks:', allTasks);
+                    console.log('Employee skills:', employee.skills);
+                    
+                    // 従業員のスキルを数字形式に正規化
+                    const normalizedSkills = employee.skills.map(skill => skillMapping[skill] || skill);
+                    console.log('Normalized skills:', normalizedSkills);
+                    
+                    allTasks.forEach(task => {
+                        if (normalizedSkills.includes(task.task_type)) {
+                            const option = document.createElement('option');
+                            option.value = task.task_type;
+                            option.textContent = task.name;
+                            if (task.task_type === selectedTaskType) {
+                                option.selected = true;
+                            }
+                            taskSelect.appendChild(option);
+                        }
+                    });
+                    
+                    console.log('Tasks loaded for employee:', taskSelect.options.length - 1);
+                } else {
+                    console.log('Employee has no skills');
+                }
+            } catch (error) {
+                console.error('従業員情報取得エラー:', error);
+            }
+        }
+        
+        // テーブル内の全シフトデータを更新
+        async function updateShifts() {
+            const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+            const selectedTime = document.querySelector('input[name="shiftTimeFilter"]:checked')?.value || 'morning';
+            
+            // 現在表示されている全ての行を取得
+            const rows = document.querySelectorAll('#dayShiftsList tbody tr');
+            if (rows.length === 0) {
+                showMessage('modalMessage', 'error', '更新するシフトがありません');
+                return;
+            }
+            
+            const updates = [];
+            const errors = [];
+            
+            // 各行からデータを収集
+            rows.forEach((row, index) => {
+                const shiftId = row.getAttribute('data-shift-id');
+                const employeeSelect = row.querySelector('.row-employee-select');
+                const taskSelect = row.querySelector('.row-task-select');
+                const startHour = row.querySelector('.row-start-hour');
+                const startMinute = row.querySelector('.row-start-minute');
+                const endHour = row.querySelector('.row-end-hour');
+                const endMinute = row.querySelector('.row-end-minute');
+                
+                const employeeId = employeeSelect?.value;
+                const taskType = taskSelect?.value;
+                const startTime = startHour?.value && startMinute?.value ? `${startHour.value}:${startMinute.value}` : '';
+                const endTime = endHour?.value && endMinute?.value ? `${endHour.value}:${endMinute.value}` : '';
+                
+                if (!employeeId || !taskType || !startTime || !endTime) {
+                    errors.push(`行${index + 1}: すべての項目を入力してください`);
+                    return;
+                }
+                
+                updates.push({
+                    shift_id: shiftId || null,
+                    date: date,
+                    employee_id: employeeId,
+                    task_type: taskType,
+                    shift_type: selectedTime,
+                    start_time: startTime,
+                    end_time: endTime
+                });
+            });
+            
+            if (errors.length > 0) {
+                showMessage('modalMessage', 'error', errors.join('<br>'));
+                return;
+            }
+            
+            // 更新処理
+            try {
+                showMessage('modalMessage', 'info', '更新中...');
+                
+                for (const shiftData of updates) {
+                    if (shiftData.shift_id) {
+                        // 既存シフトの更新（shift_idをURLエンコード）
+                        const encodedShiftId = encodeURIComponent(shiftData.shift_id);
+                        const response = await fetch(`${API_BASE}/shifts/by-id/${encodedShiftId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(shiftData)
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`シフトID ${shiftData.shift_id} の更新に失敗しました`);
+                        }
+                    } else {
+                        // プレビューシフトの確定
+                        const response = await fetch(`${API_BASE}/shifts`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(shiftData)
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`新規シフトの作成に失敗しました`);
+                        }
+                    }
+                }
+                
+                showMessage('modalMessage', 'success', '✓ シフトを更新しました');
+                await loadShiftsForDate(date);
+                updateShiftCalendar();
+            } catch (error) {
+                showMessage('modalMessage', 'error', `エラー: ${error.message}`);
+            }
+        }
+        
+        // 個別のシフト行を更新
+        async function updateSingleShift(rowId, shiftId, shiftIndex) {
+            const row = document.getElementById(rowId);
+            const employeeSelect = row?.querySelector('.row-employee-select');
+            const taskSelect = row?.querySelector('.row-task-select');
+            const startHour = row?.querySelector('.row-start-hour');
+            const startMinute = row?.querySelector('.row-start-minute');
+            const endHour = row?.querySelector('.row-end-hour');
+            const endMinute = row?.querySelector('.row-end-minute');
+            
+            const employeeId = employeeSelect?.value;
+            const taskType = taskSelect?.value;
+            const startTime = startHour?.value && startMinute?.value ? `${startHour.value}:${startMinute.value}` : '';
+            const endTime = endHour?.value && endMinute?.value ? `${endHour.value}:${endMinute.value}` : '';
+            
+            if (!employeeId || !taskType || !startTime || !endTime) {
+                showMessage('modalMessage', 'error', 'すべての項目を入力してください');
+                return;
+            }
+            
+            const employeeName = employeeSelect?.options[employeeSelect.selectedIndex]?.textContent || '従業員';
+            
+            if (!confirm(`${employeeName} のシフトを変更しますか？`)) {
+                return;
+            }
+            
+            const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+            const selectedTime = document.querySelector('input[name="shiftTimeFilter"]:checked')?.value || 'morning';
+            
+            const shiftData = {
+                shift_id: shiftId || null,
+                date: date,
+                employee_id: employeeId,
+                task_type: taskType,
+                shift_type: selectedTime,
+                start_time: startTime,
+                end_time: endTime
+            };
+            
+            try {
+                showMessage('modalMessage', 'info', '更新中...');
+                
+                if (shiftId) {
+                    // 既存シフトの更新
+                    const encodedShiftId = encodeURIComponent(shiftId);
+                    const response = await fetch(`${API_BASE}/shifts/by-id/${encodedShiftId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(shiftData)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('シフトの更新に失敗しました');
+                    }
+                } else {
+                    // プレビューシフトの確定
+                    const response = await fetch(`${API_BASE}/shifts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(shiftData)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('新規シフトの作成に失敗しました');
+                    }
+                }
+                
+                showMessage('modalMessage', 'success', '✓ シフトを更新しました');
+                await loadShiftsForDate(date);
+                updateShiftCalendar();
+            } catch (error) {
+                showMessage('modalMessage', 'error', `更新エラー: ${error.message}`);
+            }
+        }
+        
+        // シフト行を削除
+        async function deleteShiftRow(rowId, shiftId, shiftIndex) {
+            // getElementByIdを使用（IDに#が含まれていてもエスケープ不要）
+            const row = document.getElementById(rowId);
+            const employeeName = row?.querySelector('.row-employee-select option:checked')?.textContent || '従業員';
+            
+            if (!confirm(`${employeeName} のシフトを削除しますか？`)) {
+                return;
+            }
+            
+            try {
+                if (shiftId) {
+                    // DBに保存されているシフトを削除（shift_idをURLエンコード）
+                    const encodedShiftId = encodeURIComponent(shiftId);
+                    const response = await fetch(`${API_BASE}/shifts/by-id/${encodedShiftId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('シフトの削除に失敗しました');
+                    }
+                    
+                    showMessage('modalMessage', 'success', '✓ シフトを削除しました');
+                } else {
+                    // プレビューシフトを削除（メモリから削除）
+                    const allShifts = window.allShiftsForDay || [];
+                    if (shiftIndex >= 0 && shiftIndex < allShifts.length) {
+                        allShifts.splice(shiftIndex, 1);
+                    }
+                    showMessage('modalMessage', 'success', '✓ プレビューシフトを削除しました');
+                }
+                
+                // シフト一覧を再読み込み
+                const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+                await loadShiftsForDate(date);
+                updateShiftCalendar();
+            } catch (error) {
+                showMessage('modalMessage', 'error', `削除エラー: ${error.message}`);
+            }
+        }
+        
+        // When a shift checkbox is toggled (for future reference or other operations)
+        async function onShiftCheckboxChange(checkbox, shiftId, shiftIndex) {
+            // Uncheck other checkboxes (single select)
             document.querySelectorAll('.shift-checkbox').forEach(cb => {
                 if (cb !== checkbox) cb.checked = false;
             });
 
             if (!checkbox.checked) {
-                clearFormFields();
-                updateButtonStates(false);
                 return;
             }
 
-            // Enable edit and delete buttons, disable add button
-            updateButtonStates(true);
-
-            const shift = (window.currentDayShifts||[]).find(s => s.shift_id === shiftId);
+            // シフト選択時は特に何もしない（将来的に削除や編集機能を追加する場合はここに実装）
+            // Use allShiftsForDay to include both regular and preview shifts
+            const allShifts = window.allShiftsForDay || window.currentDayShifts || [];
+            
+            // Try to find shift by ID first, then by index
+            let shift;
+            if (shiftId) {
+                shift = allShifts.find(s => s.shift_id === shiftId);
+            } else if (shiftIndex !== undefined && shiftIndex >= 0) {
+                shift = allShifts[shiftIndex];
+            }
+            
             if (!shift) {
+                console.log('Shift not found. shiftId:', shiftId, 'shiftIndex:', shiftIndex, 'allShifts:', allShifts.length);
                 showMessage('modalMessage', 'error', '選択したシフト情報が見つかりません');
                 return;
             }
 
-            // Set form fields for editing
-            document.getElementById('shiftId').value = shift.shift_id;
-            document.getElementById('shiftDate').value = shift.date;
-            document.getElementById('shiftDateDisplay').textContent = shift.date;
-
-            // Set time filter based on shift type
-            const shiftType = shift.shift_type || (shift.start_time && parseInt(shift.start_time.split(':')[0]) < 12 ? 'morning' : 'afternoon');
-            const filterRadio = document.querySelector(`input[name="shiftTimeFilter"][value="${shiftType}"]`);
-            if (filterRadio) {
-                filterRadio.checked = true;
-                // Refresh the filtered list
-                filterShiftsByTime();
-                // Re-check the checkbox after filtering
-                setTimeout(() => {
-                    const reCheckbox = document.getElementById(`chk_${shiftId}`);
-                    if (reCheckbox) reCheckbox.checked = true;
-                }, 50);
-            }
-
-            // Refresh employee select to include the selected employee even if already registered
-            refreshEmployeeSelectForDate(shift.date, shift.employee_id);
-
-            // Set employee and wait for tasks to be populated
-            const employeeSelect = document.getElementById('employeeSelect');
-            employeeSelect.value = shift.employee_id;
-            
-            // Trigger change event and wait for it to complete
-            const changeEvent = new Event('change');
-            employeeSelect.dispatchEvent(changeEvent);
-            
-            // Wait for tasks to be loaded, then set task value
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // Set task type after tasks are loaded
-            const taskSelect = document.getElementById('taskSelect');
-            taskSelect.value = shift.task_type;
-            
-            // If task wasn't set (not in the list), try again after a bit more time
-            if (!taskSelect.value && shift.task_type) {
-                await new Promise(resolve => setTimeout(resolve, 200));
-                taskSelect.value = shift.task_type;
-            }
-
-            // selectに値を設定
-            setTimeSelects('startHour', 'startMinute', shift.start_time || '');
-            setTimeSelects('endHour', 'endMinute', shift.end_time || '');
-
-            // Clear modal message
-            document.getElementById('modalMessage').innerHTML = '';
+            console.log('Selected shift:', shift);
         }
 
         // Clear the input fields in the modal (but keep modal open)
         function clearFormFields() {
             document.getElementById('shiftId').value = '';
-            // repopulate employee select to exclude registered employees
-            const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
-            refreshEmployeeSelectForDate(date, null);
-            document.getElementById('taskSelect').innerHTML = '<option value="">作業を選択</option>';
-            document.getElementById('employeeSelect').value = '';
             
-            // selectを空に戻す
-            setTimeSelects('startHour', 'startMinute', '');
-            setTimeSelects('endHour', 'endMinute', '');
+            // 作業種別をリセット
+            document.getElementById('taskSelect').value = '';
+            
+            // 従業員と時間フィールドをクリアして無効化
+            const employeeSelect = document.getElementById('employeeSelect');
+            const startHour = document.getElementById('startHour');
+            const startMinute = document.getElementById('startMinute');
+            const endHour = document.getElementById('endHour');
+            const endMinute = document.getElementById('endMinute');
+            
+            employeeSelect.value = '';
+            employeeSelect.disabled = true;
+            startHour.value = '';
+            startHour.disabled = true;
+            startMinute.value = '';
+            startMinute.disabled = true;
+            endHour.value = '';
+            endHour.disabled = true;
+            endMinute.value = '';
+            endMinute.disabled = true;
             
             // 時間帯フィルターを午前に戻す
             const morningRadio = document.querySelector('input[name="shiftTimeFilter"][value="morning"]');
@@ -2186,26 +2561,6 @@
             document.getElementById('modalMessage').innerHTML = '';
             // Uncheck all checkboxes
             document.querySelectorAll('.shift-checkbox').forEach(cb => cb.checked = false);
-            updateButtonStates(false);
-        }
-
-        // Update button states based on checkbox selection
-        function updateButtonStates(isEditing) {
-            const addBtn = document.getElementById('addBtn');
-            const updateBtn = document.getElementById('updateBtn');
-            const deleteBtn = document.getElementById('deleteBtn');
-            
-            if (isEditing) {
-                // Editing mode: enable update and delete, disable add
-                addBtn.disabled = true;
-                updateBtn.disabled = false;
-                deleteBtn.disabled = false;
-            } else {
-                // Add mode: enable add, disable update and delete
-                addBtn.disabled = false;
-                updateBtn.disabled = true;
-                deleteBtn.disabled = true;
-            }
         }
 
         // Update selected shift
@@ -2332,7 +2687,7 @@
                     const empName = employeesMap[shift.employee_id] || shift.employee_id;
                     return `
                 <div class="shift-card">
-                    <h4>${shift.date} - ${getTaskName(shift.task_type)}${shift._preview? ' (プレビュー)':''}</h4>
+                    <h4>${shift.date} - ${getTaskName(shift.task_type)}${shift._preview? ' (確定前)':''}</h4>
                     <p><strong>従業員:</strong> ${empName}</p>
                     <p><strong>時間:</strong> ${shift.start_time} - ${shift.end_time}</p>
                     <p><strong>ステータス:</strong> ${getStatusName(shift.status)}</p>
@@ -2406,38 +2761,177 @@
             messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
             setTimeout(() => messageDiv.innerHTML = '', 5000);
         }
-        // 従業員選択時に対応可能な作業種別のみ表示
+        // 作業種別選択時に従業員と時間フィールドを有効化し、スキルを持つ従業員のみ表示
+        const taskSelectEl = document.getElementById('taskSelect');
+        if (taskSelectEl) {
+            taskSelectEl.addEventListener('change', async function() {
+                const taskType = this.value;
+                const employeeSelect = document.getElementById('employeeSelect');
+                const startHour = document.getElementById('startHour');
+                const startMinute = document.getElementById('startMinute');
+                const endHour = document.getElementById('endHour');
+                const endMinute = document.getElementById('endMinute');
+                
+                if (!taskType) {
+                    // 作業種別が未選択の場合、従業員と時間を無効化
+                    employeeSelect.disabled = true;
+                    startHour.disabled = true;
+                    startMinute.disabled = true;
+                    endHour.disabled = true;
+                    endMinute.disabled = true;
+                    employeeSelect.value = '';
+                    startHour.value = '';
+                    startMinute.value = '';
+                    endHour.value = '';
+                    endMinute.value = '';
+                    return;
+                }
+                
+                // 既に登録されているデータのチェックを解除
+                document.querySelectorAll('.shift-checkbox').forEach(cb => cb.checked = false);
+                
+                // 従業員と時間フィールドを有効化
+                employeeSelect.disabled = false;
+                startHour.disabled = false;
+                startMinute.disabled = false;
+                endHour.disabled = false;
+                endMinute.disabled = false;
+                
+                // シフト時間帯（午前/午後）を取得
+                const shiftTimeFilter = document.querySelector('input[name="shiftTimeFilter"]:checked')?.value || 'morning';
+                
+                // 選択された作業種別のスキルを持つ従業員のみ表示 & 規定時間を設定
+                try {
+                    const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+                    
+                    // 並列で従業員とタスク情報を取得
+                    const [employeesResponse, tasksResponse] = await Promise.all([
+                        fetch(`${API_BASE}/employees`),
+                        fetch(`${API_BASE}/tasks`)
+                    ]);
+                    const allEmployees = await employeesResponse.json();
+                    const allTasks = await tasksResponse.json();
+                    
+                    // 選択された作業種別の情報を取得
+                    const selectedTask = allTasks.find(task => task.task_type === taskType);
+                    
+                    // 規定時間を初期値として設定
+                    if (selectedTask) {
+                        let defaultStartTime, defaultEndTime;
+                        if (shiftTimeFilter === 'morning') {
+                            defaultStartTime = selectedTask.morning_start_time || '05:00';
+                            defaultEndTime = selectedTask.morning_end_time || '12:00';
+                        } else {
+                            defaultStartTime = selectedTask.afternoon_start_time || '13:00';
+                            defaultEndTime = selectedTask.afternoon_end_time || '18:00';
+                        }
+                        
+                        // 時間を分割してselectに設定
+                        if (defaultStartTime && defaultStartTime.includes(':')) {
+                            const [sh, sm] = defaultStartTime.split(':');
+                            startHour.value = sh.padStart(2, '0');
+                            startMinute.value = sm.padStart(2, '0');
+                        }
+                        if (defaultEndTime && defaultEndTime.includes(':')) {
+                            const [eh, em] = defaultEndTime.split(':');
+                            endHour.value = eh.padStart(2, '0');
+                            endMinute.value = em.padStart(2, '0');
+                        }
+                    }
+                    
+                    // スキルのマッピング（文字列形式と数字形式の両方をサポート）
+                    const skillMapping = {
+                        'milking': '1',
+                        'feeding': '2',
+                        'cleaning': '3',
+                        'patrol': '4',
+                        '1': '1',
+                        '2': '2',
+                        '3': '3',
+                        '4': '4'
+                    };
+                    
+                    // 選択された作業種別を対応可能な従業員のみフィルター
+                    const capableEmployees = allEmployees.filter(emp => {
+                        if (!emp.skills || emp.skills.length === 0) return false;
+                        // 従業員のスキルを数字形式に正規化してから比較
+                        const normalizedSkills = emp.skills.map(skill => skillMapping[skill] || skill);
+                        return normalizedSkills.includes(taskType);
+                    });
+                    
+                    employeeSelect.innerHTML = '<option value="">従業員を選択</option>';
+                    capableEmployees.forEach(emp => {
+                        const option = document.createElement('option');
+                        option.value = emp.employee_id;
+                        option.textContent = emp.name || emp.kana_name;
+                        employeeSelect.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('従業員情報取得エラー:', error);
+                }
+                
+                // フォームのバリデーションを実行
+                validateAddShiftForm();
+            });
+        }
+        
+        // 新規シフト追加フォームのバリデーション
+        function validateAddShiftForm() {
+            const taskSelect = document.getElementById('taskSelect');
+            const employeeSelect = document.getElementById('employeeSelect');
+            const startHour = document.getElementById('startHour');
+            const startMinute = document.getElementById('startMinute');
+            const endHour = document.getElementById('endHour');
+            const endMinute = document.getElementById('endMinute');
+            const addBtn = document.getElementById('addBtn');
+            
+            // 過去日チェック
+            const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+            const isPast = new Date(date) < new Date(new Date().toISOString().split('T')[0]);
+            
+            // すべてのフィールドが入力されているかチェック
+            const isValid = taskSelect.value && 
+                           employeeSelect.value && 
+                           startHour.value && 
+                           startMinute.value && 
+                           endHour.value && 
+                           endMinute.value;
+            
+            // 過去日または入力不足の場合は無効化
+            if (isValid && !isPast) {
+                addBtn.disabled = false;
+                addBtn.style.opacity = '1';
+            } else {
+                addBtn.disabled = true;
+                addBtn.style.opacity = '0.6';
+            }
+        }
+        
+        // 従業員選択時に対応可能な作業種別のみ表示（既存の動作を維持）
         const employeeSelectEl = document.getElementById('employeeSelect');
         if (employeeSelectEl) {
             employeeSelectEl.addEventListener('change', async function() {
                 const employeeId = this.value;
+                const date = document.getElementById('shiftDate').value || document.getElementById('shiftDateDisplay').textContent;
+                
+                // フォームのバリデーションを実行
+                validateAddShiftForm();
+                
                 if (!employeeId) {
-                    loadTasks();
                     return;
                 }
                 
-                try {
-                    const response = await fetch(`${API_BASE}/employees/${employeeId}`);
-                    const employee = await response.json();
-                    
-                    const taskSelect = document.getElementById('taskSelect');
-                    taskSelect.innerHTML = '<option value="">作業を選択</option>';
-                    
-                    if (employee.skills && employee.skills.length > 0) {
-                        const allTasks = await fetch(`${API_BASE}/tasks`).then(r => r.json());
-                        
-                        allTasks.forEach(task => {
-                            if (employee.skills.includes(task.task_type)) {
-                                const option = document.createElement('option');
-                                option.value = task.task_type;
-                                option.textContent = `${task.name} (${task.task_type})`;
-                                taskSelect.appendChild(option);
-                            }
-                        });
-                    }
-                } catch (error) {
-                    console.error('従業員情報取得エラー:', error);
-                    loadTasks(); // フォールバック
+                // 同じ日に同じ従業員が既に登録されているかチェック
+                const allShifts = window.allShiftsForDay || window.currentDayShifts || [];
+                const duplicateShift = allShifts.find(shift => 
+                    shift.employee_id === employeeId && shift.date === date
+                );
+                
+                if (duplicateShift) {
+                    const employeeName = window.employeesMap ? 
+                        (window.employeesMap[employeeId]?.name || window.employeesMap[employeeId]?.kana_name || employeeId) : 
+                        employeeId;
+                    showMessage('modalMessage', 'warning', `警告: ${employeeName} は既にこの日のシフトに登録されています（一人二役の場合は無視してください）`);
                 }
             });
         }
@@ -2516,7 +3010,7 @@
                 tasks.forEach(task => {
                     const option = document.createElement('option');
                     option.value = task.task_type;
-                    option.textContent = `${task.name} (${task.task_type})`;
+                    option.textContent = task.name;
                     select.appendChild(option);
                 });
             } catch (error) {

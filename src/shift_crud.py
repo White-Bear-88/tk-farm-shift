@@ -181,15 +181,26 @@ def update_shift(event):
     shift_id = event['pathParameters']['id']
     data = json.loads(event['body'])
     
-    # Parse shift_id to get PK and SK
-    parts = shift_id.split('#')
-    pk = f"SHIFT#{parts[1]}"
-    sk = f"EMP#{parts[2]}#{parts[3]}"
-    current_employee = parts[2]
-    task_type = parts[3]
-    
-    # If employee change requested, perform copy+delete to move the item
-    if 'employee_id' in data and data['employee_id'] != current_employee:
+    try:
+        # Parse shift_id: format is "SHIFT#date#employee_id#task_type"
+        parts = shift_id.split('#')
+        
+        if len(parts) < 4:
+            return {
+                'statusCode': 400,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': f'Invalid shift_id format: {shift_id}'})
+            }
+        
+        date = parts[1]
+        current_employee = parts[2]
+        task_type = parts[3]
+        
+        pk = f"SHIFT#{date}"
+        sk = f"EMP#{current_employee}#{task_type}"
+        
+        # If employee change requested, perform copy+delete to move the item
+        if 'employee_id' in data and data['employee_id'] != current_employee:
         new_employee = data['employee_id']
         # Fetch existing item
         resp = table.get_item(Key={'PK': pk, 'SK': sk})
@@ -259,19 +270,46 @@ def update_shift(event):
         'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
         'body': json.dumps({'message': 'Shift updated successfully'})
     }
+    
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'error': str(e)})
+        }
 
 def delete_shift(event):
     shift_id = event['pathParameters']['id']
     
-    # Parse shift_id to get PK and SK
-    parts = shift_id.split('#')
-    pk = f"SHIFT#{parts[1]}"
-    sk = f"EMP#{parts[2]}#{parts[3]}"
-    
-    table.delete_item(Key={'PK': pk, 'SK': sk})
-    
-    return {
-        'statusCode': 200,
-        'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
-        'body': json.dumps({'message': 'Shift deleted successfully'})
-    }
+    try:
+        # Parse shift_id: format is "SHIFT#date#employee_id#task_type"
+        parts = shift_id.split('#')
+        
+        if len(parts) < 4:
+            return {
+                'statusCode': 400,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': f'Invalid shift_id format: {shift_id}'})
+            }
+        
+        # Reconstruct PK and SK from shift_id parts
+        date = parts[1]
+        employee_id = parts[2]
+        task_type = parts[3]
+        
+        pk = f"SHIFT#{date}"
+        sk = f"EMP#{employee_id}#{task_type}"
+        
+        table.delete_item(Key={'PK': pk, 'SK': sk})
+        
+        return {
+            'statusCode': 200,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'message': 'Shift deleted successfully'})
+        }
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'error': str(e)})
+        }

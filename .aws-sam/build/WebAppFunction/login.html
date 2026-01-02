@@ -153,9 +153,6 @@
                 </div>
                 
                 <button type="submit" id="loginBtn" class="btn btn-primary">ログイン</button>
-                <div style="text-align: center; margin-top: 15px;">
-                    <a href="password-reset.html" style="color: #666; text-decoration: none; font-size: 14px;">パスワードを忘れた方はこちら</a>
-                </div>
             </form>
             <div id="message" class="message"></div>
         </div>
@@ -167,20 +164,8 @@
                 従業員登録
             </button>
         </div>
-        
-        <div class="divider">
-            <span>または</span>
-        </div>
-        
-        <div class="login-method">
-            <h3>開発用ログイン</h3>
-            <button class="btn btn-secondary" onclick="location.href='login-dev.html'">
-                開発用ログイン画面
-            </button>
-        </div>
     </div>
 
-    <script src="cognite-auth-config.js"></script>
     <script>
         const API_BASE_URL = 'https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev';
 
@@ -200,11 +185,7 @@
                 const userExists = await checkUserExists(email);
                 
                 if (!userExists) {
-                    // 未登録の場合はCognite認証登録画面へ
-                    showMessage('アカウントが見つかりません。新規登録画面に移動します...', 'info');
-                    setTimeout(() => {
-                        window.location.href = `cognite-register.html?email=${encodeURIComponent(email)}`;
-                    }, 2000);
+                    showMessage('アカウントが見つかりません。従業員登録を行ってください。', 'error');
                     return;
                 }
                 
@@ -262,22 +243,6 @@
         }
 
         async function authenticateWithCognite(email, password) {
-            // 開発環境での簡易認証
-            if (email === 'admin@example.com' && password === 'password') {
-                return {
-                    success: true,
-                    token: 'dev_token_' + Date.now(),
-                    user: {
-                        cognite_user_id: 'usr7wyygjep',
-                        name: '酪農太郎',
-                        email: email,
-                        role: 'admin',
-                        is_active: true,
-                        employee_info: { employee_id: '001' }
-                    }
-                };
-            }
-            
             // データベースでの認証
             try {
                 const response = await fetch(`${API_BASE_URL}/auth/cognite-login`, {

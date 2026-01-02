@@ -272,6 +272,57 @@ def cognite_login(data):
             }
         )
         
+        # 開発用管理者アカウントの特別処理
+        if email == 'admin@example.com':
+            if len(response['Items']) == 0:
+                # 開発用管理者アカウントが存在しない場合は作成
+                cognite_user_id = 'admin001'
+                
+                from datetime import datetime
+                admin_item = {
+                    'PK': f'COGNITE_USER#{cognite_user_id}',
+                    'SK': 'PROFILE',
+                    'cognite_user_id': cognite_user_id,
+                    'email': email,
+                    'name': '管理者',
+                    'password': password,
+                    'role': 'admin',
+                    'employee_id': '',
+                    'is_active': True,
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat()
+                }
+                
+                table.put_item(Item=admin_item)
+                
+                # JWTトークンを生成
+                token = f"cognite_token_{cognite_user_id}_{int(time.time())}"
+                
+                user_profile = {
+                    'cognite_user_id': cognite_user_id,
+                    'name': '管理者',
+                    'email': email,
+                    'role': 'admin',
+                    'is_active': True,
+                    'employee_info': None
+                }
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                    'body': json.dumps({
+                        'success': True,
+                        'token': token,
+                        'user': user_profile
+                    }, default=decimal_default)
+                }
+            else:
+                # 既存の管理者アカウントのロールを確認・更新
+                user_item = response['Items'][0]
+                if user_item.get('role') != 'admin':
+                    user_item['role'] = 'admin'
+                    table.put_item(Item=user_item)
+        
         if len(response['Items']) == 0:
             return {
                 'statusCode': 401,
@@ -595,7 +646,7 @@ def admin_change_password(data):
             'body': json.dumps({'success': False, 'error': str(e)})
         }
 
-
+def get_current_user(event):
     """現在のユーザー情報を取得（JWTからsubを抽出）"""
     try:
         # AuthorizationヘッダーからJWTトークンを取得
