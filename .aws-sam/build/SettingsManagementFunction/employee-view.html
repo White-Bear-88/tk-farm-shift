@@ -277,7 +277,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <h1 style="margin: 0;">👤 従業員画面</h1>
                     <div id="employeeSelectContainer">
@@ -287,7 +287,7 @@
                     </div>
                     <span id="employeeDisplay" style="font-weight: bold; color: #333; display: none;"></span>
                 </div>
-                <div style="display: flex; gap: 10px; margin-left: auto;">
+                <div style="display: flex; align-items: center; gap: 10px;">
                     <button id="viewOtherShiftsBtn" onclick="navigateToShiftCalendar()" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; display: none;">他の従業員のシフトを確認</button>
                     <a href="menu.html" style="text-decoration: none; color: white; background: #007bff; padding: 10px 20px; border-radius: 5px; display: inline-block;">← メニューに戻る</a>
                 </div>
@@ -400,10 +400,6 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>理由:</label>
-                    <textarea id="vacationReason" placeholder="休暇理由を入力" rows="4" style="width: 75%; resize: vertical;"></textarea>
-                </div>
                 <button type="submit" id="vacationSubmitBtn">申請</button>
             </form>
             <div id="vacationFormSpinner" style="display: none; margin-top: 10px; color: #666;">
@@ -476,43 +472,7 @@
             </div>
         </div>
 
-        <!-- 休暇承認モーダル -->
-        <div id="approveVacationModal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeApproveVacationModal()">&times;</span>
-                <h2>休暇申請承認</h2>
-                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
-                    <div class="form-group" style="margin-bottom: 10px;">
-                        <label style="font-weight: bold; display: inline;">開始日：</label>
-                        <span id="approveStartDate"></span>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 10px;">
-                        <label style="font-weight: bold; display: inline;">終了日：</label>
-                        <span id="approveEndDate"></span>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 10px;">
-                        <label style="font-weight: bold; display: inline;">休暇種別：</label>
-                        <span id="approveVacationType"></span>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 10px;">
-                        <label style="font-weight: bold; display: inline;">時間区分：</label>
-                        <span id="approveTimeType"></span>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 10px;">
-                        <label style="font-weight: bold; display: inline;">ステータス：</label>
-                        <span id="approveStatus"></span>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-weight: bold; display: inline;">休暇理由：</label>
-                        <span id="approveVacationReason"></span>
-                    </div>
-                </div>
-                <input type="hidden" id="approveRequestId">
-                <button type="button" onclick="confirmApproveVacation()">承認</button>
-                <button type="button" onclick="closeApproveVacationModal()">戻る</button>
-                <div id="approveMessage" style="margin-top: 10px;"></div>
-            </div>
-        </div>
+
 
     </div>
 
@@ -1186,7 +1146,6 @@
             const endDate = document.getElementById('vacationEndDate').value;
             const type = document.getElementById('vacationType').value;
             const timeType = document.getElementById('vacationTimeType').value;
-            const reason = document.getElementById('vacationReason').value;
             
             // 開始日の入力チェック
             if (!startDate) {
@@ -1232,7 +1191,6 @@
                 end_date: endDate || startDate,  // 終了日がなければ開始日と同じ
                 type: type,
                 time_type: timeType,  // 時間区分を追加
-                reason: reason,
                 status: 'applying'  // ステータスを申請中に設定
             };
             
@@ -1305,29 +1263,6 @@
         // 休暇取り下げモーダルを閉じる
         function closeWithdrawVacationModal() {
             document.getElementById('withdrawVacationModal').style.display = 'none';
-        }
-
-        // 休暇承認モーダルを開く（従業員画面では使用しないが、互換性のため定義）
-        function openApproveVacationModal(requestId, employeeName, startDate, endDate, vacationType, timeType, status, reason, employeeId) {
-            document.getElementById('approveRequestId').value = requestId;
-            document.getElementById('approveStartDate').textContent = startDate;
-            document.getElementById('approveEndDate').textContent = endDate;
-            document.getElementById('approveVacationType').textContent = vacationType;
-            document.getElementById('approveTimeType').textContent = timeType;
-            document.getElementById('approveStatus').textContent = status;
-            document.getElementById('approveVacationReason').textContent = reason || '-';
-            document.getElementById('approveMessage').innerHTML = '';
-            document.getElementById('approveVacationModal').style.display = 'block';
-        }
-
-        // 休暇承認モーダルを閉じる
-        function closeApproveVacationModal() {
-            document.getElementById('approveVacationModal').style.display = 'none';
-        }
-
-        // 休暇承認を確認して実行（従業員画面では使用しない）
-        async function confirmApproveVacation() {
-            // 従業員画面では承認機能は使用しない
         }
 
         // 休暇取り下げを確認して実行

@@ -20,6 +20,44 @@ Globals:
         ENVIRONMENT:
           Ref: Environment
 Resources:
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName:
+        Fn::Sub: dairy-farm-users-${Environment}
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      AutoVerifiedAttributes:
+      - email
+      UsernameAttributes:
+      - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: false
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+      Schema:
+      - Name: email
+        AttributeDataType: String
+        Required: true
+        Mutable: true
+      - Name: name
+        AttributeDataType: String
+        Required: true
+        Mutable: true
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId:
+        Ref: CognitoUserPool
+      ClientName:
+        Fn::Sub: dairy-farm-client-${Environment}
+      GenerateSecret: false
+      ExplicitAuthFlows:
+      - ADMIN_NO_SRP_AUTH
+      - USER_PASSWORD_AUTH
   ShiftManagementTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -456,6 +494,72 @@ Resources:
             Method: DELETE
     Metadata:
       SamResourceId: CogniteUserManagementFunction
+  CognitoAdminFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: dairy-cognito-admin-${Environment}
+      CodeUri: CognitoAdminFunction
+      Handler: cognito_admin.lambda_handler
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID:
+            Ref: CognitoUserPool
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: ShiftManagementTable
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - cognito-idp:ListUsers
+          - cognito-idp:AdminConfirmSignUp
+          - cognito-idp:AdminDeleteUser
+          - cognito-idp:AdminDisableUser
+          - cognito-idp:AdminEnableUser
+          Resource:
+            Fn::GetAtt:
+            - CognitoUserPool
+            - Arn
+      Events:
+        ListUsers:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /cognito-admin/users
+            Method: GET
+        ApproveUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /cognito-admin/approve
+            Method: POST
+        RejectUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /cognito-admin/reject
+            Method: POST
+        DisableUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /cognito-admin/disable
+            Method: POST
+        EnableUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /cognito-admin/enable
+            Method: POST
+    Metadata:
+      SamResourceId: CognitoAdminFunction
   AuthServiceFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -464,7 +568,7 @@ Resources:
       CodeUri: AuthServiceFunction
       Handler: auth_service.lambda_handler
       Policies:
-      - DynamoDBReadPolicy:
+      - DynamoDBCrudPolicy:
           TableName:
             Ref: ShiftManagementTable
       Events:
@@ -475,16 +579,52 @@ Resources:
               Ref: ShiftManagementApi
             Path: /auth/verify
             Method: POST
-        GetProfile:
+        GetUserBySub:
           Type: Api
           Properties:
             RestApiId:
               Ref: ShiftManagementApi
-            Path: /auth/profile
+            Path: /auth/user-by-sub/{sub}
+            Method: GET
+        CheckUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /auth/check-user
+            Method: POST
+        CogniteLogin:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /auth/cognite-login
+            Method: POST
+        CogniteRegister:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /auth/cognite-register
+            Method: POST
+        GetCurrentUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: ShiftManagementApi
+            Path: /auth/me
             Method: GET
     Metadata:
       SamResourceId: AuthServiceFunction
 Outputs:
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value:
+      Ref: CognitoUserPool
+  CognitoUserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value:
+      Ref: CognitoUserPoolClient
   WebAppUrl:
     Description: Web Application URL
     Value:

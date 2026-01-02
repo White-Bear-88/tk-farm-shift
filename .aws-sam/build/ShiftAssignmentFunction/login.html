@@ -55,18 +55,25 @@
             font-size: 16px;
             cursor: pointer;
             margin: 10px 0;
+            background: #007bff;
+            color: white;
+        }
+        .btn:hover {
+            background: #0056b3;
         }
         .btn-primary {
-            background: linear-gradient(45deg, #667eea, #764ba2);
+            background: #007bff;
             color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
         }
         .btn-secondary {
             background: #6c757d;
             color: white;
         }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        .btn-secondary:hover {
+            background: #5a6268;
         }
         .divider {
             margin: 30px 0;
@@ -82,10 +89,43 @@
             height: 1px;
             background: #ddd;
         }
-        .divider span {
-            background: white;
-            padding: 0 20px;
-            color: #666;
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
         }
     </style>
 </head>
@@ -97,17 +137,28 @@
         </div>
 
         <div class="login-method">
-            <h3>CogniteID でログイン</h3>
-            <button class="btn btn-primary" onclick="startCogniteLogin()">
-                ログイン
-            </button>
+            <h3>メールアドレスでログイン</h3>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">メールアドレス</label>
+                    <input type="email" id="email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">パスワード</label>
+                    <input type="password" id="password" required>
+                </div>
+                
+                <button type="submit" id="loginBtn">ログイン</button>
+            </form>
+            <div id="message" class="message"></div>
         </div>
         
-        <div class="divider" id="devDivider" style="display: none;">
-            <span>開発用</span>
+        <div class="divider">
+            <span>または</span>
         </div>
         
-        <div class="login-method" id="devLogin" style="display: none;">
+        <div class="login-method">
             <h3>開発用ログイン</h3>
             <button class="btn btn-secondary" onclick="location.href='login-dev.html'">
                 開発用ログイン画面
@@ -117,58 +168,135 @@
 
     <script src="cognite-auth-config.js"></script>
     <script>
-        // ページ読み込み時の初期化
-        document.addEventListener('DOMContentLoaded', function() {
-            // 開発環境でのみ開発用ログインを表示
-            if (isDevelopmentMode()) {
-                document.getElementById('devDivider').style.display = 'block';
-                document.getElementById('devLogin').style.display = 'block';
+        const API_BASE_URL = 'https://mxh6g7opm2.execute-api.ap-northeast-1.amazonaws.com/dev';
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            
+            // ボタンを無効化
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'ログイン中...';
+            
+            try {
+                // メールアドレスでユーザー存在確認
+                const userExists = await checkUserExists(email);
+                
+                if (!userExists) {
+                    // 未登録の場合はCognite認証登録画面へ
+                    showMessage('アカウントが見つかりません。新規登録画面に移動します...', 'info');
+                    setTimeout(() => {
+                        window.location.href = `cognite-register.html?email=${encodeURIComponent(email)}`;
+                    }, 2000);
+                    return;
+                }
+                
+                // 登録済みの場合はCognite認証でログイン
+                const loginResult = await authenticateWithCognite(email, password);
+                
+                if (loginResult.success) {
+                    showMessage('ログイン成功！画面を移動します...', 'info');
+                    
+                    // ユーザー情報を保存
+                    localStorage.setItem('user_info', JSON.stringify(loginResult.user));
+                    localStorage.setItem('cognite_id_token', loginResult.token);
+                    
+                    // ロールに応じて画面遷移
+                    setTimeout(() => {
+                        if (loginResult.user.role === 'admin') {
+                            window.location.href = 'menu.html';
+                        } else {
+                            window.location.href = 'employee-view.html';
+                        }
+                    }, 1000);
+                } else {
+                    showMessage('メールアドレスまたはパスワードが正しくありません', 'error');
+                }
+                
+            } catch (error) {
+                console.error('ログインエラー:', error);
+                showMessage('ログインに失敗しました。しばらく後でお試しください。', 'error');
+            } finally {
+                // ボタンを有効化
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'ログイン';
             }
         });
-        
-        function startCogniteLogin() {
-            const config = getCogniteConfig();
-            
-            // CSRF対策用のstateとnonceを生成
-            const state = generateRandomString(32);
-            const nonce = generateRandomString(32);
-            
-            // セッションストレージに保存
-            sessionStorage.setItem('cognite_auth_state', state);
-            sessionStorage.setItem('cognite_auth_nonce', nonce);
-            
-            // CogniteID認証 URLを構築
-            const authUrl = new URL(`https://${config.TENANT_DOMAIN}/oauth2/authorize`);
-            authUrl.searchParams.set('client_id', config.CLIENT_ID);
-            authUrl.searchParams.set('response_type', config.RESPONSE_TYPE);
-            authUrl.searchParams.set('scope', config.SCOPE);
-            authUrl.searchParams.set('redirect_uri', config.REDIRECT_URI);
-            authUrl.searchParams.set('state', state);
-            authUrl.searchParams.set('nonce', nonce);
-            
-            // CogniteIDログイン画面にリダイレクト
-            window.location.href = authUrl.toString();
+
+        async function checkUserExists(email) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/check-user`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email: email })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    return result.exists;
+                }
+                return false;
+            } catch (error) {
+                console.error('ユーザー確認エラー:', error);
+                return false;
+            }
         }
-        
-        function loginWithCogniteID() {
-            const config = getCogniteConfig();
+
+        async function authenticateWithCognite(email, password) {
+            // 開発環境での簡易認証
+            if (email === 'admin@example.com' && password === 'password') {
+                return {
+                    success: true,
+                    token: 'dev_token_' + Date.now(),
+                    user: {
+                        cognite_user_id: 'usr7wyygjep',
+                        name: '酪農太郎',
+                        email: email,
+                        role: 'admin',
+                        is_active: true,
+                        employee_info: { employee_id: '001' }
+                    }
+                };
+            }
             
-            // 認証URLを構築
-            const authUrl = new URL(`${config.cogniteDomain}/oauth2/authorize`);
-            authUrl.searchParams.set('client_id', config.clientId);
-            authUrl.searchParams.set('response_type', 'code');
-            authUrl.searchParams.set('scope', config.scope);
-            authUrl.searchParams.set('redirect_uri', config.redirectUri);
-            
-            // 状態パラメータを生成（CSRF対策）
-            const state = generateRandomString(32);
-            localStorage.setItem('cognite_auth_state', state);
-            authUrl.searchParams.set('state', state);
-            
-            // CogniteIDログイン画面にリダイレクト
-            window.location.href = authUrl.toString();
+            // データベースでの認証
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/cognite-login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email: email, password: password })
+                });
+                
+                if (response.ok) {
+                    return await response.json();
+                }
+                return { success: false };
+            } catch (error) {
+                console.error('Cognite認証エラー:', error);
+                return { success: false };
+            }
         }
-        
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            if (type === 'error') {
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
         function generateRandomString(length) {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
             let result = '';

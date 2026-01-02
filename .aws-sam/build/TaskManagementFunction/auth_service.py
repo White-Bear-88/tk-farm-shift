@@ -1,7 +1,7 @@
 import json
 import boto3
 import os
-import jwt
+import time
 from decimal import Decimal
 
 # Support local dynamodb endpoint
@@ -45,6 +45,12 @@ def lambda_handler(event, context):
         elif method == 'GET' and '/auth/user-by-sub/' in path:
             sub = path.split('/')[-1]
             return get_user_by_sub(sub)
+        elif method == 'POST' and path == '/auth/check-user':
+            return check_user_exists(json.loads(event['body']))
+        elif method == 'POST' and path == '/auth/cognite-login':
+            return cognite_login(json.loads(event['body']))
+        elif method == 'POST' and path == '/auth/cognite-register':
+            return cognite_register(json.loads(event['body']))
         elif method == 'GET' and path == '/auth/me':
             return get_current_user(event)
         
@@ -72,18 +78,20 @@ def verify_jwt_token(data):
                 'body': json.dumps({'error': 'Token is required'})
             }
         
-        # JWTトークンをデコード（検証なしでデモ用）
-        # 本番環境では適切な秘密鍵で検証する必要があります
-        try:
-            decoded = jwt.decode(token, options={"verify_signature": False})
-        except jwt.InvalidTokenError:
+        # 簡易トークン処理（開発環境用）
+        if not token.startswith('cognite_token_'):
             return {
                 'statusCode': 401,
                 'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': 'Invalid token'})
             }
         
-        cognite_user_id = decoded.get('sub')
+        # トークンからユーザーIDを抽出
+        try:
+            parts = token.split('_')
+            cognite_user_id = parts[2] if len(parts) > 2 else None
+        except:
+            cognite_user_id = None
         if not cognite_user_id:
             return {
                 'statusCode': 401,
@@ -146,17 +154,20 @@ def get_user_profile(event):
         
         token = auth_header.replace('Bearer ', '')
         
-        # JWTトークンをデコード
-        try:
-            decoded = jwt.decode(token, options={"verify_signature": False})
-        except jwt.InvalidTokenError:
+        # 簡易トークン処理（開発環境用）
+        if not token.startswith('cognite_token_'):
             return {
                 'statusCode': 401,
                 'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': 'Invalid token'})
             }
         
-        cognite_user_id = decoded.get('sub')
+        # トークンからユーザーIDを抽出
+        try:
+            parts = token.split('_')
+            cognite_user_id = parts[2] if len(parts) > 2 else None
+        except:
+            cognite_user_id = None
         if not cognite_user_id:
             return {
                 'statusCode': 401,
@@ -200,6 +211,195 @@ def get_user_profile(event):
             'body': json.dumps({'error': str(e)})
         }
 
+def check_user_exists(data):
+    """メールアドレスでユーザーの存在を確認"""
+    try:
+        email = data.get('email')
+        if not email:
+            return {
+                'statusCode': 400,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': 'Email is required'})
+            }
+        
+        # CogniteIDユーザーをメールアドレスで検索
+        response = table.scan(
+            FilterExpression='begins_with(PK, :pk) AND email = :email',
+            ExpressionAttributeValues={
+                ':pk': 'COGNITE_USER#',
+                ':email': email
+            }
+        )
+        
+        exists = len(response['Items']) > 0
+        
+        return {
+            'statusCode': 200,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'exists': exists})
+        }
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'error': str(e)})
+        }
+
+def cognite_login(data):
+    """メールアドレス+パスワードでCognite認証ログイン"""
+    try:
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return {
+                'statusCode': 400,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': 'Email and password are required'})
+            }
+        
+        # メールアドレスでユーザーを検索
+        response = table.scan(
+            FilterExpression='begins_with(PK, :pk) AND email = :email',
+            ExpressionAttributeValues={
+                ':pk': 'COGNITE_USER#',
+                ':email': email
+            }
+        )
+        
+        if len(response['Items']) == 0:
+            return {
+                'statusCode': 401,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'success': False, 'error': 'User not found'})
+            }
+        
+        user_item = response['Items'][0]
+        
+        # パスワードチェック（簡易実装）
+        stored_password = user_item.get('password', '')
+        if stored_password != password:
+            return {
+                'statusCode': 401,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'success': False, 'error': 'Invalid password'})
+            }
+        
+        # ユーザー情報を取得
+        cognite_user = {
+            'cognite_user_id': user_item['PK'].split('#')[1],
+            'name': user_item.get('name', ''),
+            'email': user_item.get('email', ''),
+            'role': user_item.get('role', 'employee'),
+            'employee_id': user_item.get('employee_id', ''),
+            'is_active': user_item.get('is_active', True)
+        }
+        
+        # 従業員情報を取得
+        employee_info = None
+        if cognite_user.get('employee_id'):
+            employee_info = get_employee_by_id(cognite_user['employee_id'])
+        
+        # JWTトークンを生成（簡易版）
+        token = f"cognite_token_{cognite_user['cognite_user_id']}_{int(time.time())}"
+        
+        user_profile = {
+            'cognite_user_id': cognite_user['cognite_user_id'],
+            'name': cognite_user['name'],
+            'email': cognite_user['email'],
+            'role': cognite_user['role'],
+            'is_active': cognite_user['is_active'],
+            'employee_info': employee_info
+        }
+        
+        return {
+            'statusCode': 200,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({
+                'success': True,
+                'token': token,
+                'user': user_profile
+            }, default=decimal_default)
+        }
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'success': False, 'error': str(e)})
+        }
+
+def cognite_register(data):
+    """新規Cogniteユーザー登録"""
+    try:
+        email = data.get('email')
+        name = data.get('name')
+        password = data.get('password')
+        
+        if not email or not name or not password:
+            return {
+                'statusCode': 400,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'error': 'Email, name, and password are required'})
+            }
+        
+        # 既存ユーザーチェック
+        response = table.scan(
+            FilterExpression='begins_with(PK, :pk) AND email = :email',
+            ExpressionAttributeValues={
+                ':pk': 'COGNITE_USER#',
+                ':email': email
+            }
+        )
+        
+        if len(response['Items']) > 0:
+            return {
+                'statusCode': 409,
+                'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+                'body': json.dumps({'success': False, 'error': 'User already exists'})
+            }
+        
+        # 新しいCogniteIDを生成
+        import random
+        import string
+        cognite_user_id = 'usr' + ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        
+        # 新規ユーザーを作成
+        from datetime import datetime
+        item = {
+            'PK': f'COGNITE_USER#{cognite_user_id}',
+            'SK': 'PROFILE',
+            'cognite_user_id': cognite_user_id,
+            'email': email,
+            'name': name,
+            'password': password,  # 開発環境では平文保存（本番ではハッシュ化が必要）
+            'role': 'employee',  # デフォルトは従業員
+            'employee_id': '',  # 後で管理者が設定
+            'is_active': True,
+            'created_at': datetime.now().isoformat(),
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        table.put_item(Item=item)
+        
+        return {
+            'statusCode': 201,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({
+                'success': True,
+                'cognite_user_id': cognite_user_id,
+                'message': 'User created successfully'
+            })
+        }
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
+            'body': json.dumps({'success': False, 'error': str(e)})
+        }
+
 def get_current_user(event):
     """現在のユーザー情報を取得（JWTからsubを抽出）"""
     try:
@@ -216,18 +416,20 @@ def get_current_user(event):
         
         token = auth_header.replace('Bearer ', '')
         
-        # JWTトークンをデコード（簡易版、本番では署名検証が必要）
-        try:
-            import jwt
-            decoded = jwt.decode(token, options={"verify_signature": False})
-        except:
+        # 簡易トークン処理（開発環境用）
+        if not token.startswith('cognite_token_'):
             return {
                 'statusCode': 401,
                 'headers': {**{'Content-Type': 'application/json'}, **get_cors_headers()},
                 'body': json.dumps({'error': 'Invalid token'})
             }
         
-        sub = decoded.get('sub')
+        # トークンからユーザーIDを抽出
+        try:
+            parts = token.split('_')
+            sub = parts[2] if len(parts) > 2 else None
+        except:
+            sub = None
         if not sub:
             return {
                 'statusCode': 401,
