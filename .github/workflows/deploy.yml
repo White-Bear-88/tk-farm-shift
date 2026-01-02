@@ -43,6 +43,7 @@ jobs:
         run: aws s3 sync ./dist s3://tk-farm-frontend-234737608655 --delete
 
       - name: Invalidate CloudFront cache
-        run: aws cloudfront create-invalidation \
-          --distribution-id E1193E26KA63SB \
-          --paths "/*"
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E1193E26KA63SB \
+            --paths "/*"
