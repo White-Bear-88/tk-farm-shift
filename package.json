@@ -5,6 +5,7 @@
     "@playwright/test": "^1.35.0"
   },
   "scripts": {
+    "build": "cd cdk && npm run build",
     "test:ui": "npx playwright test"
   }
 }
