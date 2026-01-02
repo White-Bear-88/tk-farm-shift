@@ -21,8 +21,16 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build
-        run: npm run build
+      - name: Build CDK
+        run: |
+          cd cdk && npm install && npm run build
+          cd ..
+
+      - name: Prepare frontend files
+        run: |
+          mkdir -p dist
+          cp -r frontend/* dist/ 2>/dev/null || true
+          cp -r src/*.html src/*.js src/*.css src/*.ico dist/ 2>/dev/null || true
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
